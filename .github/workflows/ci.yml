@@ -1,0 +1,14 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install g++
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Build LRU
+        run: |
+          g++ -std=c++17 lld/lru_cache/src/lru_cache.cpp -O2 -o lld/lru_cache/bin/lru || true
+      - name: List files
+        run: ls -R
