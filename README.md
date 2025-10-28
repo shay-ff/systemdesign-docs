@@ -1,60 +1,41 @@
-# System Design Primer (C++ focus)
+# systemdesign-docs — A practical system design learning roadmap
 
-A compact, interview-focused **System Design** repository targeted at:
-- Teaching core HLD concepts and introducing LLD.
-- Hands-on **C++** low-level design examples.
-- Illustrated diagrams (PlantUML sources included).
-- Common interview questions with worked solutions.
+This repository is a curated, student-friendly course for learning system design from first principles to advanced architectures. It combines short theory notes, hands-on low-level examples (C++), and interview-focused practice — all organized as a guided learning path.
 
-## Highlights
-- Language: **C++** (examples & small demos)
-- Diagrams: PlantUML (`.puml`) + exported PNG placeholders
-- Study plan, flashcards, and interview checklist
+Who this is for:
+- 3rd-year students or early-career engineers who want a practical, interview-ready grasp of system design.
+- Developers who prefer running small LLD examples (C++) while understanding HLD trade-offs.
 
-## Structure
-- `docs/` — theory, cheat sheets, patterns
-- `lld/` — C++ hands-on examples with UML `.puml` and code
-- `hld/` — HLD worked examples and templates
-- `interview/` — common questions + solutions
-- `assets/` — PlantUML sources and exported PNG placeholders
- 
+What you'll find here:
+- 00-foundations/ — concise core concepts, glossary, cheat-sheet and FAQs.
+- 01-ll-designs/ — implementable low-level systems (LRU cache, rate limiter, URL shortener, parking lot) with PlantUML + C++ examples.
+- 02-hl-designs/ — end-to-end high-level designs (Twitter clone example) with requirements and trade-offs.
+- 03-implementations/ — runnable microservice prototypes demonstrating key concepts.
+- 04-interview-prep/ — most-asked questions, checklist and worked solutions.
+- 05-study-plan/ — weekly roadmap, milestones and flashcards (JSON) for spaced repetition.
+- assets/ — diagrams and exported images used by the docs.
 
-## Usage
-1. Clone or unzip.
-2. Read `docs/concepts.md` then try examples in `lld/`.
-3. Render diagrams: install PlantUML (or use an online renderer) and open `.puml` files.
+Quick getting started
+1. Start in `00-foundations/` — read `README.md` and `concepts.md` to get the mental model.
+2. Try a small LLD example from `01-ll-designs/` (compile and run the C++ demo).
+3. Study the HLD templates in `02-hl-designs/`, then practice interview prompts in `04-interview-prep/`.
 
-## Quickstart
-1. Ensure a modern C++ compiler is installed (e.g., `g++` with `-std=c++17`).
-2. Compile and run an example:
-   - LRU Cache:
-     - `cd lld/lru_cache/src`
-     - `g++ -std=c++17 lru_cache.cpp -o lru && ./lru`
-   - URL Shortener:
-     - `cd lld/url_shortener/src`
-     - `g++ -std=c++17 url_shortener.cpp -o url && ./url`
-   - Rate Limiter (Token Bucket simulation):
-     - `cd lld/rate_limiter/src`
-     - `g++ -std=c++17 token_bucket.cpp -o token && ./token`
+How to run the examples (short)
+- LRU cache example:
+  - `cd 01-ll-designs/lru_cache/src`
+  - `g++ -std=c++17 lru_cache.cpp -O2 -o lru && ./lru`
+- Token bucket rate limiter:
+  - `cd 01-ll-designs/rate_limiter/src`
+  - `g++ -std=c++17 token_bucket.cpp -O2 -o token && ./token`
 
-## Rendering Diagrams (PlantUML)
-Options:
-- VS Code: install "PlantUML" extension, open `.puml` and preview.
-- CLI: install Java + PlantUML jar, then:
-  - `plantuml hld/design_twitter_clone/architecture.puml`
-  - `plantuml lld/lru_cache/design.puml`
-- Web: copy `.puml` into any online PlantUML renderer.
+Rendering diagrams
+- Use the PlantUML VS Code extension or run the PlantUML CLI to render `.puml` files. Diagrams are referenced from `/assets/` and `assets/diagrams/`.
 
-Outputs (`.png`) will be generated alongside sources.
+Contributing (short)
+- Contributions are welcome. See `CONTRIBUTING.md` for guidelines. Keep changes small, explain the learning goal, and include a short example or test where relevant.
 
-## Suggested Study Path
-1. Read `docs/concepts.md` for HLD vs LLD and glossary.
-2. Skim `docs/cheatsheet.md` for rules of thumb and sizing.
-3. Walk through `lld/` examples (LRU, URL shortener, rate limiter): compile and run.
-4. Review patterns in `docs/design-patterns.md` to understand trade-offs.
-5. Open `hld/design_twitter_clone/` diagrams and requirements; reason about trade-offs in `tradeoffs.md`.
-6. Practice with prompts in `interview/`.
+License & credits
+- This project is licensed under the MIT License (see `LICENSE`).
+- Many small code examples were written for education; diagrams use PlantUML and images in `assets/`.
 
-## Notes
-- Examples are intentionally small and focused on clarity over completeness.
-- Some demos include `#include <bits/stdc++.h>` for brevity; replace with explicit headers if your toolchain lacks it.
+If you'd like, I can now create the full folder layout and add polished README and concept files for each section. 

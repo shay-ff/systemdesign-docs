@@ -1,0 +1,58 @@
+@startuml
+class ParkingLot {
+  - name_: string
+  - levels_: Level[]
+  - pricing_: PricingPolicy
+  - licenseToTicket_: map<string, Ticket>
+  - spotKeyToLicense_: map<long, string>
+  + park(v: Vehicle): Ticket
+  + unpark(t: Ticket): double
+}
+
+class Level {
+  + levelIndex: int
+  + spots: ParkingSpot[]
+  + allocate(type: VehicleType): (bool, int)
+  + freeSpot(idx: int): void
+}
+
+class ParkingSpot {
+  + spotId: int
+  + spotType: SpotType
+  + occupied: bool
+}
+
+class PricingPolicy {
+  + baseFee: double
+  + perHourMotorcycle: double
+  + perHourCar: double
+  + perHourBus: double
+  + price(type: VehicleType, entry: time, exit: time): double
+}
+
+enum VehicleType { Motorcycle, Car, Bus }
+enum SpotType { Motorcycle, Compact, Large }
+
+class Ticket {
+  + ticketId: string
+  + license: string
+  + type: VehicleType
+  + entryTime: time
+  + levelIndex: int
+  + spotType: SpotType
+}
+
+class Vehicle {
+  + license: string
+  + type: VehicleType
+}
+
+ParkingLot "1" o-- "many" Level
+Level "1" o-- "many" ParkingSpot
+ParkingLot .. PricingPolicy
+Ticket .. VehicleType
+Ticket .. SpotType
+ParkingSpot .. SpotType
+Vehicle .. VehicleType
+@enduml
+

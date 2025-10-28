@@ -9,6 +9,6 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential
       - name: Build LRU
         run: |
-          g++ -std=c++17 lld/lru_cache/src/lru_cache.cpp -O2 -o lld/lru_cache/bin/lru || true
+          g++ -std=c++17 01-ll-designs/lru_cache/src/lru_cache.cpp -O2 -o 01-ll-designs/lru_cache/bin/lru || true
       - name: List files
         run: ls -R
