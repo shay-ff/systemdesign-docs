@@ -1,8 +1,8 @@
 /**
  * Enhanced Token Bucket Rate Limiter Implementation - C++
  * 
- * This is an enhanced version of the original token bucket implementation
- * with better documentation, thread safety, and additional features.
+ * This is an enhanced version with thread safety, better documentation,
+ * and additional features for production use.
  * 
  * Compile: g++ -std=c++17 -pthread token_bucket.cpp -o token_bucket
  * Run: ./token_bucket
