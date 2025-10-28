@@ -49,7 +49,7 @@
   - Add spell check and grammar validation
   - _Requirements: 1.1_
 
-- [ ] 2. Low-level design implementations with multi-language support
+- [x] 2. Low-level design implementations with multi-language support
 
   - Enhance existing LLD examples with complete multi-language implementations
   - Create new LLD examples for missing core components
@@ -74,7 +74,7 @@
   - Write detailed explanation.md covering different rate limiting algorithms
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-- [ ] 2.3 Create consistent hashing implementation
+- [x] 2.3 Create consistent hashing implementation
 
   - Create 01-ll-designs/consistent_hashing/ directory structure
   - Implement consistent hashing in Python, Java, C++, and Go
@@ -83,7 +83,7 @@
   - Include benchmark comparisons between implementations
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 2.4 Create message queue implementation
+- [x] 2.4 Create message queue implementation
 
   - Create 01-ll-designs/message_queue/ directory structure
   - Implement simple in-memory message queue in all four languages
@@ -92,7 +92,7 @@
   - Write explanation covering queue patterns and reliability guarantees
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-- [ ] 2.5 Create bloom filter implementation
+- [x] 2.5 Create bloom filter implementation
 
   - Create 01-ll-designs/bloom_filter/ directory structure
   - Implement bloom filter with configurable false positive rate

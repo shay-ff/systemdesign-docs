@@ -1,0 +1,186 @@
+@startuml Bloom Filter Architecture
+
+!define RECTANGLE class
+
+package "Bloom Filter System" {
+    
+    RECTANGLE BloomFilter {
+        -bitArray: BitArray
+        -numHashFunctions: int
+        -bitArraySize: int
+        -numElements: int
+        -expectedElements: int
+        -falsePositiveRate: double
+        +add(element: string): void
+        +contains(element: string): boolean
+        +getFalsePositiveRate(): double
+        +getMemoryUsage(): int
+        +clear(): void
+    }
+    
+    RECTANGLE BitArray {
+        -bits: array<boolean>
+        -size: int
+        +setBit(index: int): void
+        +getBit(index: int): boolean
+        +clear(): void
+        +getSize(): int
+    }
+    
+    RECTANGLE HashFunction {
+        +hash(data: string, seed: int): int
+        +murmurHash(data: string, seed: int): int
+        +fnvHash(data: string): int
+        +djb2Hash(data: string): int
+    }
+    
+    RECTANGLE BloomFilterBuilder {
+        -expectedElements: int
+        -falsePositiveRate: double
+        +withExpectedElements(n: int): BloomFilterBuilder
+        +withFalsePositiveRate(p: double): BloomFilterBuilder
+        +build(): BloomFilter
+        -calculateOptimalBitArraySize(): int
+        -calculateOptimalHashFunctions(): int
+    }
+    
+    RECTANGLE BloomFilterStats {
+        +bitArraySize: int
+        +numHashFunctions: int
+        +numElements: int
+        +expectedElements: int
+        +falsePositiveRate: double
+        +memoryUsage: int
+        +fillRatio: double
+    }
+}
+
+' Relationships
+BloomFilter ||--|| BitArray : uses
+BloomFilter ||--o{ HashFunction : uses multiple
+BloomFilterBuilder ||--|| BloomFilter : creates
+BloomFilter ||--|| BloomFilterStats : provides
+
+' Notes
+note right of BloomFilter : Core data structure\nwith configurable parameters
+note right of BitArray : Underlying storage\nfor bit manipulation
+note right of HashFunction : Multiple independent\nhash functions
+note right of BloomFilterBuilder : Builder pattern for\noptimal configuration
+
+@enduml
+
+@startuml Bloom Filter Operations
+
+participant Client
+participant BloomFilter
+participant BitArray
+participant HashFunction
+
+== Add Element ==
+Client -> BloomFilter: add("example.com")
+BloomFilter -> HashFunction: hash("example.com", seed1)
+HashFunction --> BloomFilter: index1
+BloomFilter -> HashFunction: hash("example.com", seed2)
+HashFunction --> BloomFilter: index2
+BloomFilter -> HashFunction: hash("example.com", seed3)
+HashFunction --> BloomFilter: index3
+
+BloomFilter -> BitArray: setBit(index1)
+BloomFilter -> BitArray: setBit(index2)
+BloomFilter -> BitArray: setBit(index3)
+
+== Check Membership ==
+Client -> BloomFilter: contains("example.com")
+BloomFilter -> HashFunction: hash("example.com", seed1)
+HashFunction --> BloomFilter: index1
+BloomFilter -> HashFunction: hash("example.com", seed2)
+HashFunction --> BloomFilter: index2
+BloomFilter -> HashFunction: hash("example.com", seed3)
+HashFunction --> BloomFilter: index3
+
+BloomFilter -> BitArray: getBit(index1)
+BitArray --> BloomFilter: true
+BloomFilter -> BitArray: getBit(index2)
+BitArray --> BloomFilter: true
+BloomFilter -> BitArray: getBit(index3)
+BitArray --> BloomFilter: true
+
+BloomFilter --> Client: true (possibly in set)
+
+== Check Non-existent Element ==
+Client -> BloomFilter: contains("notfound.com")
+BloomFilter -> HashFunction: hash("notfound.com", seed1)
+HashFunction --> BloomFilter: index1
+BloomFilter -> HashFunction: hash("notfound.com", seed2)
+HashFunction --> BloomFilter: index2
+BloomFilter -> HashFunction: hash("notfound.com", seed3)
+HashFunction --> BloomFilter: index3
+
+BloomFilter -> BitArray: getBit(index1)
+BitArray --> BloomFilter: true
+BloomFilter -> BitArray: getBit(index2)
+BitArray --> BloomFilter: false
+
+BloomFilter --> Client: false (definitely not in set)
+
+@enduml
+
+@startuml Bloom Filter Parameter Optimization
+
+start
+
+:Input: Expected Elements (n)\nDesired False Positive Rate (p);
+
+:Calculate Optimal Bit Array Size:\nm = -(n × ln(p)) / (ln(2)²);
+
+:Calculate Optimal Hash Functions:\nk = (m / n) × ln(2);
+
+:Round k to nearest integer;
+
+:Create Bloom Filter with\nparameters (m, k);
+
+:Calculate Actual False Positive Rate:\np_actual = (1 - e^(-kn/m))^k;
+
+if (p_actual <= desired p?) then (yes)
+    :Bloom Filter Ready;
+    stop
+else (no)
+    :Adjust parameters\n(increase m or decrease k);
+    :Recalculate;
+endif
+
+@enduml
+
+@startuml Memory Usage Comparison
+
+!define TABLE class
+
+package "Memory Comparison" {
+    TABLE HashSet {
+        Elements: 1M strings
+        Avg String Length: 20 chars
+        Memory: ~80 MB
+        False Positives: 0%
+        False Negatives: 0%
+    }
+    
+    TABLE BloomFilter_1percent {
+        Elements: 1M strings
+        False Positive Rate: 1%
+        Memory: ~1.2 MB
+        False Positives: ~1%
+        False Negatives: 0%
+    }
+    
+    TABLE BloomFilter_01percent {
+        Elements: 1M strings
+        False Positive Rate: 0.1%
+        Memory: ~1.9 MB
+        False Positives: ~0.1%
+        False Negatives: 0%
+    }
+}
+
+note bottom : Bloom Filter provides\n60-80x memory savings\nwith controlled false positives
+
+@enduml

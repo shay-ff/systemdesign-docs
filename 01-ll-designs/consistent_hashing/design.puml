@@ -1,0 +1,61 @@
+@startuml Consistent Hashing Architecture
+
+!define RECTANGLE class
+
+title Consistent Hashing - Hash Ring Architecture
+
+' Hash Ring visualization
+circle "Hash Ring" as ring {
+  note top : Keys and nodes are hashed\nto positions on the ring
+  
+  ' Virtual nodes on the ring
+  rectangle "Node A\n(Virtual 1)" as a1 #lightblue
+  rectangle "Node A\n(Virtual 2)" as a2 #lightblue
+  rectangle "Node A\n(Virtual 3)" as a3 #lightblue
+  
+  rectangle "Node B\n(Virtual 1)" as b1 #lightgreen
+  rectangle "Node B\n(Virtual 2)" as b2 #lightgreen
+  rectangle "Node B\n(Virtual 3)" as b3 #lightgreen
+  
+  rectangle "Node C\n(Virtual 1)" as c1 #lightyellow
+  rectangle "Node C\n(Virtual 2)" as c2 #lightyellow
+  rectangle "Node C\n(Virtual 3)" as c3 #lightyellow
+  
+  ' Keys on the ring
+  rectangle "Key 1" as k1 #pink
+  rectangle "Key 2" as k2 #pink
+  rectangle "Key 3" as k3 #pink
+  rectangle "Key 4" as k4 #pink
+}
+
+' Physical nodes
+rectangle "Physical Node A\n192.168.1.10" as nodeA #lightblue
+rectangle "Physical Node B\n192.168.1.11" as nodeB #lightgreen  
+rectangle "Physical Node C\n192.168.1.12" as nodeC #lightyellow
+
+' Connections
+nodeA --> a1
+nodeA --> a2
+nodeA --> a3
+
+nodeB --> b1
+nodeB --> b2
+nodeB --> b3
+
+nodeC --> c1
+nodeC --> c2
+nodeC --> c3
+
+' Key assignments (clockwise)
+k1 --> a1 : "Assigned to Node A"
+k2 --> b2 : "Assigned to Node B"
+k3 --> c1 : "Assigned to Node C"
+k4 --> a3 : "Assigned to Node A"
+
+note bottom of ring
+  Keys are assigned to the first node
+  encountered when moving clockwise
+  from the key's hash position
+end note
+
+@enduml
