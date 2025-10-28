@@ -133,7 +133,7 @@
   - Include database sharding strategy and caching layers
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 3.3 Create Uber system design
+- [x] 3.3 Create Uber system design
 
   - Create 02-hl-designs/uber_system/ directory structure
   - Write requirements for ride matching, real-time tracking, and payments

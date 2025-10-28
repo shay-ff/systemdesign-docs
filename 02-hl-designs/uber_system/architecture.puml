@@ -1,0 +1,200 @@
+@startuml Uber System Architecture
+
+!define RECTANGLE class
+
+title Uber System Architecture - High Level Overview
+
+' External actors
+actor "Rider Mobile App" as RiderApp
+actor "Driver Mobile App" as DriverApp
+actor "Admin Dashboard" as AdminDash
+actor "Customer Support" as Support
+
+' API Gateway and Load Balancer
+RECTANGLE "API Gateway" as Gateway {
+  [Load Balancer]
+  [Rate Limiter]
+  [Authentication]
+  [Request Router]
+}
+
+' Core Microservices
+package "Core Services" {
+  RECTANGLE "User Service" as UserSvc {
+    [User Management]
+    [Authentication]
+    [Profile Service]
+  }
+  
+  RECTANGLE "Location Service" as LocationSvc {
+    [GPS Tracking]
+    [Geocoding]
+    [Route Optimization]
+  }
+  
+  RECTANGLE "Matching Service" as MatchingSvc {
+    [Driver Matching]
+    [Demand Prediction]
+    [Supply Optimization]
+  }
+  
+  RECTANGLE "Trip Service" as TripSvc {
+    [Trip Management]
+    [State Machine]
+    [Trip History]
+  }
+  
+  RECTANGLE "Payment Service" as PaymentSvc {
+    [Payment Processing]
+    [Billing]
+    [Pricing Engine]
+  }
+  
+  RECTANGLE "Notification Service" as NotificationSvc {
+    [Push Notifications]
+    [SMS Service]
+    [Email Service]
+  }
+}
+
+' Supporting Services
+package "Supporting Services" {
+  RECTANGLE "Analytics Service" as AnalyticsSvc {
+    [Real-time Analytics]
+    [Business Intelligence]
+    [Reporting]
+  }
+  
+  RECTANGLE "Driver Onboarding" as DriverOnboarding {
+    [Background Checks]
+    [Document Verification]
+    [Vehicle Inspection]
+  }
+  
+  RECTANGLE "Customer Support Service" as SupportSvc {
+    [Ticket Management]
+    [Chat Support]
+    [Dispute Resolution]
+  }
+}
+
+' Data Layer
+package "Data Layer" {
+  database "User Database" as UserDB {
+    [User Profiles]
+    [Driver Profiles]
+    [Authentication Data]
+  }
+  
+  database "Location Database" as LocationDB {
+    [Real-time Locations]
+    [Historical Tracks]
+    [Geospatial Indexes]
+  }
+  
+  database "Trip Database" as TripDB {
+    [Active Trips]
+    [Trip History]
+    [Trip States]
+  }
+  
+  database "Payment Database" as PaymentDB {
+    [Payment Methods]
+    [Transactions]
+    [Billing Records]
+  }
+  
+  database "Analytics Database" as AnalyticsDB {
+    [Event Logs]
+    [Metrics]
+    [Reports]
+  }
+}
+
+' Message Queue and Cache
+package "Infrastructure" {
+  RECTANGLE "Message Queue" as MQ {
+    [Kafka/RabbitMQ]
+    [Event Streaming]
+    [Async Processing]
+  }
+  
+  RECTANGLE "Cache Layer" as Cache {
+    [Redis Cluster]
+    [Session Store]
+    [Location Cache]
+  }
+  
+  RECTANGLE "Search Engine" as Search {
+    [Elasticsearch]
+    [Location Search]
+    [Driver Search]
+  }
+}
+
+' External Services
+package "External Services" {
+  RECTANGLE "Maps Service" as Maps {
+    [Google Maps API]
+    [Route Calculation]
+    [Traffic Data]
+  }
+  
+  RECTANGLE "Payment Gateway" as PaymentGW {
+    [Stripe/PayPal]
+    [Credit Card Processing]
+    [Digital Wallets]
+  }
+  
+  RECTANGLE "SMS/Email Provider" as CommProvider {
+    [Twilio]
+    [SendGrid]
+    [Push Notification Service]
+  }
+}
+
+' Connections - External to Gateway
+RiderApp --> Gateway
+DriverApp --> Gateway
+AdminDash --> Gateway
+Support --> Gateway
+
+' Connections - Gateway to Services
+Gateway --> UserSvc
+Gateway --> LocationSvc
+Gateway --> MatchingSvc
+Gateway --> TripSvc
+Gateway --> PaymentSvc
+Gateway --> NotificationSvc
+Gateway --> AnalyticsSvc
+Gateway --> SupportSvc
+
+' Connections - Services to Data
+UserSvc --> UserDB
+LocationSvc --> LocationDB
+TripSvc --> TripDB
+PaymentSvc --> PaymentDB
+AnalyticsSvc --> AnalyticsDB
+
+' Connections - Services to Infrastructure
+LocationSvc --> Cache
+MatchingSvc --> Cache
+TripSvc --> MQ
+PaymentSvc --> MQ
+NotificationSvc --> MQ
+AnalyticsSvc --> Search
+
+' Connections - Services to External
+LocationSvc --> Maps
+PaymentSvc --> PaymentGW
+NotificationSvc --> CommProvider
+DriverOnboarding --> UserSvc
+
+' Inter-service Communication
+MatchingSvc --> LocationSvc : "Get Driver Locations"
+MatchingSvc --> UserSvc : "Get User Preferences"
+TripSvc --> PaymentSvc : "Process Payment"
+TripSvc --> NotificationSvc : "Send Updates"
+AnalyticsSvc --> TripSvc : "Trip Events"
+
+@enduml
