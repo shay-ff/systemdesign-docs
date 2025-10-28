@@ -43,13 +43,13 @@
   - Add spell check and grammar validation
   - _Requirements: 1.1_
 
-- [ ] 2. Low-level design implementations with multi-language support
+- [-] 2. Low-level design implementations with multi-language support
   - Enhance existing LLD examples with complete multi-language implementations
   - Create new LLD examples for missing core components
   - Standardize structure and documentation across all LLD examples
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 2.1 Enhance existing LRU cache implementation
+- [x] 2.1 Enhance existing LRU cache implementation
   - Create Python implementation in 01-ll-designs/lru_cache/solutions/python/
   - Create Java implementation in 01-ll-designs/lru_cache/solutions/java/
   - Create Go implementation in 01-ll-designs/lru_cache/solutions/go/
