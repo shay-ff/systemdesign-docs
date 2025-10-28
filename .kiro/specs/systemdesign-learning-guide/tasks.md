@@ -108,14 +108,14 @@
   - Add integration tests for multi-component scenarios
   - _Requirements: 2.1, 2.4_
 
-- [ ] 3. High-level system design expansions
+- [-] 3. High-level system design expansions
 
   - Enhance existing Twitter clone design with complete documentation
   - Create comprehensive designs for major distributed systems
   - Standardize documentation structure across all HLD examples
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 3.1 Enhance existing Twitter clone design
+- [x] 3.1 Enhance existing Twitter clone design
 
   - Expand 02-hl-designs/twitter_clone/requirements.md with detailed functional and non-functional requirements
   - Create comprehensive 02-hl-designs/twitter_clone/api-design.md with REST API specifications
@@ -124,7 +124,7 @@
   - Write detailed 02-hl-designs/twitter_clone/solution.md with complete walkthrough
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 3.2 Create URL shortener high-level design
+- [x] 3.2 Create URL shortener high-level design
 
   - Create 02-hl-designs/url_shortener/ directory with complete structure
   - Write requirements covering URL encoding, analytics, and scale requirements

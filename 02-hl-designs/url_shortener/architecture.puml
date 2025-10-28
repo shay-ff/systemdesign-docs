@@ -1,0 +1,99 @@
+@startuml URL Shortener Architecture
+
+!define RECTANGLE class
+
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+
+' Client Layer
+RECTANGLE "Web Browser" as WEB #E1F5FE
+RECTANGLE "Mobile Apps" as MOBILE #E1F5FE
+RECTANGLE "API Clients" as API_CLIENT #E1F5FE
+
+' CDN and Load Balancing
+RECTANGLE "CDN\n(CloudFlare)" as CDN #FFF3E0
+RECTANGLE "Global Load Balancer\n(DNS-based)" as GLB #FFF3E0
+RECTANGLE "Regional Load Balancer\n(Application-level)" as RLB #FFF3E0
+
+' API Gateway
+RECTANGLE "API Gateway" as AG #E8F5E8
+RECTANGLE "Rate Limiter" as RATE #E8F5E8
+RECTANGLE "Authentication" as AUTH #E8F5E8
+
+' Application Services
+RECTANGLE "URL Shortener Service" as USS #F3E5F5
+RECTANGLE "Redirection Service" as RS #F3E5F5
+RECTANGLE "Analytics Service" as AS #F3E5F5
+RECTANGLE "User Service" as US #F3E5F5
+
+' Caching Layer
+RECTANGLE "Redis Cluster\n(URL Cache)" as REDIS #FFEBEE
+RECTANGLE "CDN Cache\n(Static Content)" as CDN_CACHE #FFEBEE
+
+' Message Queue
+RECTANGLE "Apache Kafka\n(Click Events)" as KAFKA #FFF8E1
+
+' Database Layer
+database "PostgreSQL\n(URL Mappings)" as PG_URL #E3F2FD
+database "PostgreSQL\n(User Data)" as PG_USER #E3F2FD
+database "Cassandra\n(Analytics)" as CASSANDRA #E3F2FD
+database "Object Storage\n(QR Codes)" as S3 #E3F2FD
+
+' External Services
+RECTANGLE "URL Validator" as VALIDATOR #F1F8E9
+RECTANGLE "QR Code Generator" as QR #F1F8E9
+RECTANGLE "Safe Browsing API" as SAFE #F1F8E9
+
+' Client connections
+WEB --> CDN
+MOBILE --> CDN
+API_CLIENT --> CDN
+
+' CDN and Load Balancing
+CDN --> GLB
+GLB --> RLB
+RLB --> AG
+
+' API Gateway
+AG --> RATE
+AG --> AUTH
+AG --> USS
+AG --> RS
+AG --> AS
+AG --> US
+
+' Service connections
+USS --> PG_URL
+USS --> REDIS
+USS --> VALIDATOR
+USS --> QR
+USS --> SAFE
+
+RS --> REDIS
+RS --> PG_URL
+RS --> KAFKA
+
+AS --> CASSANDRA
+AS --> KAFKA
+
+US --> PG_USER
+
+' Cache connections
+REDIS --> PG_URL
+CDN_CACHE --> CDN
+
+' Message processing
+KAFKA --> AS
+
+' External service connections
+VALIDATOR --> SAFE
+QR --> S3
+
+' Notes
+note right of USS : Handles URL creation\nand management
+note right of RS : Fast URL redirection\nwith caching
+note right of AS : Click tracking and\nanalytics processing
+note right of REDIS : Cache for popular URLs\nand user sessions
+note right of KAFKA : Asynchronous processing\nof click events
+
+@enduml

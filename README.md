@@ -1,9 +1,9 @@
 # systemdesign-docs — A practical system design learning roadmap
 
-This repository is a curated, student-friendly course for learning system design from first principles to advanced architectures. It combines short theory notes, hands-on low-level examples (C++), and interview-focused practice — all organized as a guided learning path.
+This repository is a curated, student-friendly for learning system design from first principles to advanced architectures. It combines short theory notes, hands-on low-level examples (C++), and interview-focused practice — all organized as a guided learning path.
 
 Who this is for:
-- 3rd-year students or early-career engineers who want a practical, interview-ready grasp of system design.
+- Students or early-career engineers who want a practical, interview-ready grasp of system design.
 - Developers who prefer running small LLD examples (C++) while understanding HLD trade-offs.
 
 What you'll find here:
@@ -38,4 +38,4 @@ License & credits
 - This project is licensed under the MIT License (see `LICENSE`).
 - Many small code examples were written for education; diagrams use PlantUML and images in `assets/`.
 
-If you'd like, I can now create the full folder layout and add polished README and concept files for each section. 
+Drop a star if you liked this repo!
