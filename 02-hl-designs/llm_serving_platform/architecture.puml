@@ -1,0 +1,110 @@
+@startuml LLM Serving Platform Architecture
+
+!define RECTANGLE class
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+title LLM Serving Platform Architecture
+
+' External actors
+actor "Developer" as dev
+actor "Application" as app
+actor "Admin" as admin
+actor "Data Scientist" as ds
+
+' Load balancers and API Gateway
+rectangle "Global Load Balancer" as glb #lightblue
+rectangle "API Gateway" as gateway #lightblue
+rectangle "Rate Limiter" as ratelimit #lightblue
+
+' Core services
+rectangle "Authentication Service" as auth #lightgreen
+rectangle "Model Management Service" as modelMgmt #lightgreen
+rectangle "Inference Service" as inference #lightgreen
+rectangle "Batch Processing Service" as batch #lightgreen
+rectangle "Content Safety Service" as safety #lightgreen
+rectangle "Billing Service" as billing #lightgreen
+rectangle "Analytics Service" as analytics #lightgreen
+rectangle "Monitoring Service" as monitoring #lightgreen
+
+' Model serving infrastructure
+rectangle "Model Router" as router #orange
+rectangle "Model Server Pool" as serverPool #orange
+rectangle "GPU Cluster Manager" as gpuMgr #orange
+rectangle "Model Cache" as modelCache #orange
+rectangle "Response Cache" as responseCache #orange
+
+' Storage systems
+database "User Database\n(PostgreSQL)" as userDB #yellow
+database "Model Registry\n(PostgreSQL)" as modelDB #yellow
+database "Usage Analytics\n(ClickHouse)" as analyticsDB #yellow
+database "Configuration Store\n(Redis)" as configStore #yellow
+database "Session Cache\n(Redis)" as sessionCache #yellow
+database "Model Storage\n(S3/GCS)" as modelStorage #yellow
+
+' External systems
+cloud "GPU Clusters\n(A100/H100)" as gpuClusters #lightcoral
+cloud "Model Training\n(External)" as training #lightcoral
+cloud "Content Moderation AI" as moderationAI #lightcoral
+cloud "Monitoring Stack\n(Prometheus/Grafana)" as monitoringStack #lightcoral
+
+' User interactions
+dev --> glb : API Requests
+app --> glb : Inference Requests
+admin --> glb : Management
+ds --> glb : Model Deployment
+
+' Load balancing and routing
+glb --> gateway : Route Requests
+gateway --> ratelimit : Rate Check
+ratelimit --> auth : Authentication
+
+' Service routing
+auth --> modelMgmt : Model Operations
+auth --> inference : Inference Requests
+auth --> batch : Batch Jobs
+auth --> billing : Usage Tracking
+auth --> analytics : Analytics Queries
+
+' Model serving flow
+inference --> safety : Content Check
+safety --> router : Route to Model
+router --> serverPool : Select Server
+serverPool --> gpuMgr : GPU Allocation
+gpuMgr --> gpuClusters : Execute Inference
+
+' Caching layers
+router --> modelCache : Model Artifacts
+inference --> responseCache : Response Cache
+serverPool --> modelCache : Load Models
+
+' Data storage
+auth --> userDB : User Data
+auth --> sessionCache : Sessions
+modelMgmt --> modelDB : Model Metadata
+modelMgmt --> modelStorage : Model Files
+billing --> analyticsDB : Usage Data
+analytics --> analyticsDB : Query Analytics
+monitoring --> configStore : Configuration
+
+' Model management
+modelMgmt --> training : Model Updates
+modelMgmt --> modelStorage : Store Models
+modelMgmt --> serverPool : Deploy Models
+
+' Safety and moderation
+safety --> moderationAI : Content Analysis
+safety --> configStore : Safety Policies
+
+' Monitoring and analytics
+serverPool --> monitoring : Metrics
+gpuClusters --> monitoring : GPU Metrics
+inference --> analytics : Usage Events
+monitoring --> monitoringStack : System Metrics
+
+' Batch processing
+batch --> gpuClusters : Bulk Inference
+batch --> analyticsDB : Batch Results
+
+@enduml

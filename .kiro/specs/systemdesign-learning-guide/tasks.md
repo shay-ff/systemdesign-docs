@@ -108,7 +108,7 @@
   - Add integration tests for multi-component scenarios
   - _Requirements: 2.1, 2.4_
 
-- [-] 3. High-level system design expansions
+- [x] 3. High-level system design expansions
 
   - Enhance existing Twitter clone design with complete documentation
   - Create comprehensive designs for major distributed systems
@@ -142,7 +142,7 @@
   - Include real-time communication design and scaling strategies
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 3.4 Create Netflix streaming system design
+- [x] 3.4 Create Netflix streaming system design
 
   - Create 02-hl-designs/netflix_streaming/ directory structure
   - Write requirements for video streaming, content delivery, and recommendations
@@ -151,7 +151,7 @@
   - Include video encoding pipeline and recommendation system architecture
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 3.5 Create YouTube system design
+- [x] 3.5 Create YouTube system design
 
   - Create 02-hl-designs/youtube/ directory structure
   - Write requirements for video upload, processing, and streaming
@@ -160,7 +160,7 @@
   - Include content moderation and monetization system design
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 3.6 Create LLM serving platform design
+- [x] 3.6 Create LLM serving platform design
 
   - Create 02-hl-designs/llm_serving_platform/ directory structure
   - Write requirements for model serving, scaling, and inference optimization
@@ -176,7 +176,7 @@
   - Include performance benchmarks and monitoring
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 4.1 Create cache server implementation
+- [x] 4.1 Create cache server implementation
 
   - Create 03-implementations/cache-server/ directory structure
   - Implement REST API cache service in Python using Flask/FastAPI

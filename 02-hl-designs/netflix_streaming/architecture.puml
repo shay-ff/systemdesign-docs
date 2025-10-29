@@ -1,0 +1,103 @@
+@startuml Netflix Streaming Architecture
+
+!define RECTANGLE class
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+title Netflix Streaming System Architecture
+
+' External actors
+actor "User" as user
+actor "Content Creator" as creator
+actor "Admin" as admin
+
+' Load balancers and API Gateway
+rectangle "Load Balancer" as lb #lightblue
+rectangle "API Gateway" as gateway #lightblue
+
+' Core microservices
+rectangle "User Service" as userSvc #lightgreen
+rectangle "Content Service" as contentSvc #lightgreen
+rectangle "Streaming Service" as streamSvc #lightgreen
+rectangle "Recommendation Service" as recoSvc #lightgreen
+rectangle "Search Service" as searchSvc #lightgreen
+rectangle "Analytics Service" as analyticsSvc #lightgreen
+rectangle "Notification Service" as notifSvc #lightgreen
+
+' Data processing services
+rectangle "Video Processing Service" as videoProc #orange
+rectangle "ML Pipeline" as mlPipeline #orange
+rectangle "Encoding Service" as encodingSvc #orange
+
+' Storage systems
+database "User Database\n(PostgreSQL)" as userDB #yellow
+database "Content Metadata DB\n(PostgreSQL)" as contentDB #yellow
+database "Analytics DB\n(ClickHouse)" as analyticsDB #yellow
+database "Search Index\n(Elasticsearch)" as searchDB #yellow
+database "Cache Layer\n(Redis)" as cache #yellow
+database "Video Storage\n(S3/Object Store)" as videoStorage #yellow
+
+' External systems
+cloud "CDN Network\n(CloudFront)" as cdn #lightcoral
+cloud "ML Platform\n(SageMaker)" as mlPlatform #lightcoral
+cloud "Message Queue\n(Kafka)" as messageQueue #lightcoral
+
+' User interactions
+user --> lb : Browse/Stream Content
+creator --> lb : Upload Content
+admin --> lb : Manage System
+
+' Load balancing
+lb --> gateway : Route Requests
+
+' API Gateway routing
+gateway --> userSvc : User Management
+gateway --> contentSvc : Content Operations
+gateway --> streamSvc : Video Streaming
+gateway --> recoSvc : Recommendations
+gateway --> searchSvc : Search Queries
+
+' Service interactions
+userSvc --> userDB : User Data
+userSvc --> cache : Session Cache
+
+contentSvc --> contentDB : Metadata
+contentSvc --> videoStorage : Video Files
+contentSvc --> videoProc : Process Videos
+
+streamSvc --> cdn : Serve Videos
+streamSvc --> cache : Streaming State
+streamSvc --> analyticsDB : View Events
+
+recoSvc --> mlPipeline : Get Recommendations
+recoSvc --> cache : Cache Recommendations
+recoSvc --> userDB : User Preferences
+
+searchSvc --> searchDB : Search Index
+searchSvc --> cache : Search Cache
+
+videoProc --> encodingSvc : Encode Videos
+videoProc --> videoStorage : Store Processed Videos
+videoProc --> messageQueue : Processing Events
+
+mlPipeline --> mlPlatform : Train Models
+mlPipeline --> analyticsDB : Training Data
+mlPipeline --> messageQueue : Model Updates
+
+analyticsSvc --> analyticsDB : Store Events
+analyticsSvc --> messageQueue : Consume Events
+
+notifSvc --> messageQueue : Consume Notifications
+notifSvc --> userSvc : User Preferences
+
+' CDN content delivery
+cdn --> videoStorage : Origin Content
+cdn --> user : Cached Content
+
+' Message flow
+messageQueue --> recoSvc : User Events
+messageQueue --> analyticsSvc : System Events
+messageQueue --> notifSvc : Notification Events
+
+@enduml
