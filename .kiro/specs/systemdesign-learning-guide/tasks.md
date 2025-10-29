@@ -169,7 +169,7 @@
   - Include GPU resource management and cost optimization strategies
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. Runnable implementation prototypes
+- [x] 4. Runnable implementation prototypes
 
   - Create working microservice implementations demonstrating key concepts
   - Provide Docker containerization and deployment instructions
@@ -185,7 +185,7 @@
   - Include API documentation and performance benchmarks
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 4.2 Create rate limiter service implementation
+- [x] 4.2 Create rate limiter service implementation
 
   - Create 03-implementations/rate-limiter-service/ directory structure
   - Implement standalone rate limiting service with multiple algorithms
@@ -194,7 +194,7 @@
   - Include Docker setup and load testing scripts
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 4.3 Create simple message broker implementation
+- [x] 4.3 Create simple message broker implementation
 
   - Create 03-implementations/simple-message-broker/ directory structure
   - Implement basic pub/sub message broker in Go
@@ -203,7 +203,7 @@
   - Include Docker setup and performance testing
   - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 4.4 Create distributed lock service implementation
+- [x] 4.4 Create distributed lock service implementation
 
   - Create 03-implementations/distributed-lock/ directory structure
   - Implement distributed locking using Redis or etcd

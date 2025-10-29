@@ -1,0 +1,4 @@
+Flask==2.3.3
+redis==5.0.1
+prometheus-client==0.17.1
+gunicorn==21.2.0

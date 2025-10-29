@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message Broker WebSocket Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .panel h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, textarea, button, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 3px;
+            margin: 10px 0;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background-color: #f8f9fa;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .message.sent {
+            background-color: #e3f2fd;
+            border-left: 3px solid #2196f3;
+        }
+        .message.received {
+            background-color: #f3e5f5;
+            border-left: 3px solid #9c27b0;
+        }
+        .message.system {
+            background-color: #fff3e0;
+            border-left: 3px solid #ff9800;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Message Broker WebSocket Client</h1>
+    
+    <div class="status" id="status">Disconnected</div>
+    
+    <div class="container">
+        <div class="panel">
+            <h3>Connection</h3>
+            <input type="text" id="wsUrl" value="ws://localhost:8080/ws" placeholder="WebSocket URL">
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+        
+        <div class="panel">
+            <h3>Subscribe to Topic</h3>
+            <input type="text" id="subscribeTopic" placeholder="Topic name (e.g., user.events)">
+            <button onclick="subscribe()" disabled id="subscribeBtn">Subscribe</button>
+            
+            <h4>Active Subscriptions:</h4>
+            <div id="subscriptions"></div>
+        </div>
+        
+        <div class="panel">
+            <h3>Publish Message</h3>
+            <input type="text" id="publishTopic" placeholder="Topic name">
+            <textarea id="messageData" rows="4" placeholder='Message data (JSON)
+Example:
+{
+  "userId": 123,
+  "action": "login",
+  "timestamp": "2023-01-01T00:00:00Z"
+}'></textarea>
+            <button onclick="publishMessage()" disabled id="publishBtn">Publish</button>
+        </div>
+        
+        <div class="panel">
+            <h3>Messages</h3>
+            <button onclick="clearMessages()">Clear Messages</button>
+            <div class="messages" id="messages"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let subscriptions = new Set();
+
+        function updateStatus(connected) {
+            const status = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+            const publishBtn = document.getElementById('publishBtn');
+
+            if (connected) {
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+                publishBtn.disabled = false;
+            } else {
+                status.textContent = 'Disconnected';
+                status.className = 'status disconnected';
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                subscribeBtn.disabled = true;
+                publishBtn.disabled = true;
+            }
+        }
+
+        function addMessage(type, content, topic = null) {
+            const messages = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const topicInfo = topic ? ` [${topic}]` : '';
+            
+            messageDiv.innerHTML = `
+                <div class="timestamp">${timestamp}${topicInfo}</div>
+                <div>${content}</div>
+            `;
+            
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = function(event) {
+                    updateStatus(true);
+                    addMessage('system', 'Connected to message broker');
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        
+                        switch(data.type) {
+                            case 'message':
+                                addMessage('received', 
+                                    `<strong>Message:</strong><br><pre>${JSON.stringify(data.data, null, 2)}</pre>`, 
+                                    data.topic
+                                );
+                                break;
+                            case 'subscribed':
+                                addMessage('system', `Subscribed to topic: ${data.topic}`);
+                                subscriptions.add(data.topic);
+                                updateSubscriptionsList();
+                                break;
+                            case 'unsubscribed':
+                                addMessage('system', `Unsubscribed from topic: ${data.topic}`);
+                                subscriptions.delete(data.topic);
+                                updateSubscriptionsList();
+                                break;
+                            case 'published':
+                                addMessage('system', `Message published to ${data.topic} (ID: ${data.messageId})`);
+                                break;
+                            case 'error':
+                                addMessage('system', `Error: ${data.error}`);
+                                break;
+                            default:
+                                addMessage('received', `<pre>${JSON.stringify(data, null, 2)}</pre>`);
+                        }
+                    } catch (e) {
+                        addMessage('received', event.data);
+                    }
+                };
+                
+                ws.onclose = function(event) {
+                    updateStatus(false);
+                    addMessage('system', 'Connection closed');
+                    subscriptions.clear();
+                    updateSubscriptionsList();
+                };
+                
+                ws.onerror = function(error) {
+                    addMessage('system', `Connection error: ${error}`);
+                };
+                
+            } catch (error) {
+                addMessage('system', `Failed to connect: ${error}`);
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function subscribe() {
+            const topic = document.getElementById('subscribeTopic').value.trim();
+            if (!topic) {
+                alert('Please enter a topic name');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to message broker');
+                return;
+            }
+            
+            const message = {
+                type: 'subscribe',
+                topic: topic,
+                timestamp: new Date().toISOString()
+            };
+            
+            ws.send(JSON.stringify(message));
+            addMessage('sent', `Subscribe request sent for topic: ${topic}`);
+            document.getElementById('subscribeTopic').value = '';
+        }
+
+        function unsubscribe(topic) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            
+            const message = {
+                type: 'unsubscribe',
+                topic: topic,
+                timestamp: new Date().toISOString()
+            };
+            
+            ws.send(JSON.stringify(message));
+            addMessage('sent', `Unsubscribe request sent for topic: ${topic}`);
+        }
+
+        function publishMessage() {
+            const topic = document.getElementById('publishTopic').value.trim();
+            const dataText = document.getElementById('messageData').value.trim();
+            
+            if (!topic) {
+                alert('Please enter a topic name');
+                return;
+            }
+            
+            if (!dataText) {
+                alert('Please enter message data');
+                return;
+            }
+            
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to message broker');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(dataText);
+                
+                const message = {
+                    type: 'publish',
+                    topic: topic,
+                    data: data,
+                    timestamp: new Date().toISOString()
+                };
+                
+                ws.send(JSON.stringify(message));
+                addMessage('sent', `Published to ${topic}:<br><pre>${JSON.stringify(data, null, 2)}</pre>`);
+                
+                // Clear the form
+                document.getElementById('publishTopic').value = '';
+                document.getElementById('messageData').value = '';
+                
+            } catch (error) {
+                alert('Invalid JSON in message data: ' + error.message);
+            }
+        }
+
+        function updateSubscriptionsList() {
+            const container = document.getElementById('subscriptions');
+            container.innerHTML = '';
+            
+            if (subscriptions.size === 0) {
+                container.innerHTML = '<em>No active subscriptions</em>';
+                return;
+            }
+            
+            subscriptions.forEach(topic => {
+                const div = document.createElement('div');
+                div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin: 5px 0; padding: 5px; background: #f0f0f0; border-radius: 3px;';
+                div.innerHTML = `
+                    <span>${topic}</span>
+                    <button onclick="unsubscribe('${topic}')" style="width: auto; padding: 2px 8px; margin: 0;">Unsubscribe</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // Initialize
+        updateStatus(false);
+        updateSubscriptionsList();
+
+        // Handle Enter key in input fields
+        document.getElementById('subscribeTopic').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                subscribe();
+            }
+        });
+
+        // Auto-connect on page load (optional)
+        // connect();
+    </script>
+</body>
+</html>
