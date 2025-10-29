@@ -1,6 +1,0 @@
-@startuml
-class URLShortener {
-  + shorten(originalUrl: string) : string
-  + expand(shortCode: string) : string
-}
-@enduml
