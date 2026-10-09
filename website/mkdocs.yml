@@ -161,6 +161,7 @@ nav:
           - Explanation: 01-ll-designs/splitwise/explanation.md
       - URL Shortener:
           - 01-ll-designs/url_shortener/README.md
+          - Explanation: 01-ll-designs/url_shortener/explanation.md
       - Vending Machine:
           - 01-ll-designs/vending_machine/README.md
           - Explanation: 01-ll-designs/vending_machine/explanation.md
