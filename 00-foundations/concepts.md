@@ -280,11 +280,11 @@ Peak traffic (3x average) = ~36K RPS
 Now that you understand the core concepts, choose your learning path:
 
 ### **Hands-On Learners**
-- **Try Building**: Start with [LRU Cache implementation](../01-ll-designs/lru_cache/README.md) to see concepts in action
-- **Run Examples**: Deploy a [cache server](../03-implementations/cache-server/README.md) to understand caching in practice
+- **Try Building**: Start with [LRU Cache implementation](../01-ll-designs/lru_cache/) to see concepts in action
+- **Run Examples**: Deploy a [cache server](../03-implementations/cache-server/) to understand caching in practice
 
 ### **Architecture Focus**
-- **Study Real Systems**: Explore [Twitter Clone design](../02-hl-designs/twitter_clone/README.md) to see concepts applied at scale
+- **Study Real Systems**: Explore [Twitter Clone design](../02-hl-designs/twitter_clone/) to see concepts applied at scale
 - **Learn Patterns**: Review [design patterns](design-patterns.md) for common architectural solutions
 
 ### **Interview Preparation**

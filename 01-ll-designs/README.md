@@ -1,11 +1,16 @@
 # Low-Level Design — Hands-On Component Implementations
 
+<<<<<<< HEAD
 > 🧭 **Navigation**: [← Foundations](../00-foundations/README.md) | [📍 Full Navigation](../NAVIGATION.md) | [Next: High-Level Designs →](../02-hl-designs/README.md)
+=======
+> 🧭 **Navigation**: [← Foundations](../00-foundations/) | [📍 Full Navigation](../NAVIGATION.md) | [Next: High-Level Designs →](../02-hl-designs/)
+>>>>>>> origin/main
 
 Build your understanding through hands-on implementation of core system components. Each design includes multi-language solutions, architectural diagrams, and detailed explanations.
 
 ## 🏗️ Available Designs
 
+<<<<<<< HEAD
 ### Classic LLD Interview Problems (Java)
 
 These are the problems asked in low-level design and machine-coding rounds, each
@@ -33,6 +38,14 @@ Building-block data structures and infrastructure components:
 - **[Consistent Hashing](consistent_hashing/README.md)** — Distributed hash ring with virtual nodes
 - **[Message Queue](message_queue/README.md)** — Producer-consumer pattern with multiple subscribers
 - **[Bloom Filter](bloom_filter/README.md)** — Probabilistic data structure for membership testing
+=======
+### Core Components
+- **[LRU Cache](lru_cache/)** — Least Recently Used cache with O(1) operations
+- **[Rate Limiter](rate_limiter/)** — Token bucket and sliding window algorithms  
+- **[Consistent Hashing](consistent_hashing/)** — Distributed hash ring with virtual nodes
+- **[Message Queue](message_queue/)** — Producer-consumer pattern with multiple subscribers
+- **[Bloom Filter](bloom_filter/)** — Probabilistic data structure for membership testing
+>>>>>>> origin/main
 
 ### 🌐 Multi-Language Support
 
@@ -84,11 +97,19 @@ g++ -std=c++17 lru_cache.cpp -o lru && ./lru
 
 ### Recommended Learning Order
 
+<<<<<<< HEAD
 1. **[LRU Cache](lru_cache/README.md)** — Start here for fundamental data structure design
 2. **[Rate Limiter](rate_limiter/README.md)** — Learn about system protection and algorithms
 3. **[Consistent Hashing](consistent_hashing/README.md)** — Understand distributed system concepts
 4. **[Message Queue](message_queue/README.md)** — Explore asynchronous communication patterns
 5. **[Bloom Filter](bloom_filter/README.md)** — Dive into probabilistic data structures
+=======
+1. **[LRU Cache](lru_cache/)** — Start here for fundamental data structure design
+2. **[Rate Limiter](rate_limiter/)** — Learn about system protection and algorithms
+3. **[Consistent Hashing](consistent_hashing/)** — Understand distributed system concepts
+4. **[Message Queue](message_queue/)** — Explore asynchronous communication patterns
+5. **[Bloom Filter](bloom_filter/)** — Dive into probabilistic data structures
+>>>>>>> origin/main
 
 ## 📊 Visual Learning
 
@@ -130,10 +151,17 @@ Or use online viewers like [PlantText](https://www.planttext.com/)
 
 After mastering low-level designs:
 
+<<<<<<< HEAD
 - **Production Systems**: Try [runnable implementations](../03-implementations/README.md) with Docker
 - **System Architecture**: Explore [high-level designs](../02-hl-designs/README.md) like Twitter and Uber
 - **Interview Practice**: Use these as building blocks in [interview prep](../04-interview-prep/README.md)
 - **Advanced Topics**: Check the [study plan](../05-study-plan/README.md) for structured progression
+=======
+- **Production Systems**: Try [runnable implementations](../03-implementations/) with Docker
+- **System Architecture**: Explore [high-level designs](../02-hl-designs/) like Twitter and Uber
+- **Interview Practice**: Use these as building blocks in [interview prep](../04-interview-prep/)
+- **Advanced Topics**: Check the [study plan](../05-study-plan/) for structured progression
+>>>>>>> origin/main
 
 ## 🔗 Related Resources
 

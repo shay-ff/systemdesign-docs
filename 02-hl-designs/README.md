@@ -24,6 +24,21 @@ Master large-scale distributed system design through comprehensive breakdowns of
 ### Infrastructure & Tools
 - **[URL Shortener](url_shortener/README.md)** — Link shortening service with analytics
 - **[LLM Serving Platform](llm_serving_platform/README.md)** — AI model serving with auto-scaling
+### Social & Communication
+- **[Twitter Clone](twitter_clone/)** — Social media platform with timeline, tweets, and following
+- **[Chat System](chat_system/)** — Real-time messaging with presence and group chats *(Coming Soon)*
+
+### Content & Media  
+- **[Netflix Streaming](netflix_streaming/)** — Video streaming with CDN and recommendations
+- **[YouTube](youtube/)** — Video upload, processing, and global distribution
+
+### Marketplace & Services
+- **[Uber System](uber_system/)** — Ride-sharing with real-time matching and tracking
+- **[E-commerce Platform](ecommerce/)** — Online marketplace with inventory and payments *(Coming Soon)*
+
+### Infrastructure & Tools
+- **[URL Shortener](url_shortener/)** — Link shortening service with analytics
+- **[LLM Serving Platform](llm_serving_platform/)** — AI model serving with auto-scaling
 
 ## 📋 Design Structure
 
@@ -72,6 +87,10 @@ Each system design includes:
 1. **[Uber System](uber_system/README.md)** — Real-time systems with complex matching
 2. **[YouTube](youtube/README.md)** — Video processing and massive scale
 3. **[LLM Serving Platform](llm_serving_platform/README.md)** — AI/ML infrastructure
+1. **[URL Shortener](url_shortener/)** — Simple service with clear requirements
+2. **[Twitter Clone](twitter_clone/)** — Social platform with moderate complexity
+3. **[Netflix Streaming](netflix_streaming/)** — Content delivery with global scale
+
 
 ## 📊 Visual Learning
 
