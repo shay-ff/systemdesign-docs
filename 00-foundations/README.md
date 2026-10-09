@@ -37,13 +37,8 @@ This folder contains short, focused notes that form the mental model you should 
 
 After completing the foundations:
 
-<<<<<<< HEAD
 - **Hands-On Learners**: Try building an [LRU Cache](../01-ll-designs/lru_cache/README.md) to see concepts in action
 - **Architecture Focus**: Explore the [Twitter Clone](../02-hl-designs/twitter_clone/README.md) system design
-=======
-- **Hands-On Learners**: Try building an [LRU Cache](../01-ll-designs/lru_cache/) to see concepts in action
-- **Architecture Focus**: Explore the [Twitter Clone](../02-hl-designs/twitter_clone/) system design
->>>>>>> origin/main
 - **Interview Prep**: Jump to [Interview Frameworks](../04-interview-prep/frameworks.md)
 - **Structured Study**: Follow the [6-Week Study Plan](../05-study-plan/study_plan.md)
 
