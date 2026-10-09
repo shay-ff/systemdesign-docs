@@ -1,0 +1,229 @@
+@startuml
+title Logger Framework — Class Diagram
+
+' ============================================================
+' FACADE / SUBJECT  -- what application code touches
+' ============================================================
+class LoggerManager {
+  - enricher: MessageEnricher
+  - observers: CopyOnWriteArrayList<LogObserver>
+  - publishedCount: AtomicLong
+  - suppressedCount: AtomicLong
+  - config: LoggerConfig   {volatile, swapped atomically}
+  - chainHead: Logger      {volatile}
+  - asyncAppender: AsyncAppender
+  + LoggerManager(initialConfig: LoggerConfig)
+  + debug/info/warn/error(caller: String, text: String): void
+  + log(level: LogLevel, caller: String, text: String): void
+  + attachSink(sink: LogSink): void
+  + detachSink(sink: LogSink): boolean
+  + notifyObservers(targetSink: LogSink, message: LogMessage): void
+  + reconfigure(newConfig: LoggerConfig): void
+  + shutdown(): void
+  + describeChain(): String
+  ' TWO ROLES: observer subject (attach/detach sinks at runtime)
+  '            chain owner (builds DEBUG->INFO->WARN->ERROR once)
+  ' HOT PATH: filter -> enrich -> route -> deliver
+}
+
+' ============================================================
+' CHAIN OF RESPONSIBILITY  -- one link per level
+' ============================================================
+abstract class Logger {
+  # handlerLevel: LogLevel
+  - manager: LoggerManager
+  - next: Logger  {volatile -> safe runtime rewiring}
+  + {final} handle(message: LogMessage): void
+  # matchesLevel(level: LogLevel): boolean
+  # publish(message: LogMessage): void
+  + setNext(nextLogger: Logger): Logger
+  + getNext(): Logger
+  ' TEMPLATE METHOD: handle() fixes the sequence;
+  '   only matchesLevel()/publish() vary per subclass.
+  ' PASS-THROUGH (not stop-at-first-match): levels are a
+  '   filter, and one message may interest several links.
+}
+class DebugLogger {
+  + DebugLogger(manager: LoggerManager)
+}
+class InfoLogger {
+  + InfoLogger(manager: LoggerManager)
+}
+class WarnLogger {
+  + WarnLogger(manager: LoggerManager)
+}
+class ErrorLogger {
+  + ErrorLogger(manager: LoggerManager)
+}
+
+Logger <|-- DebugLogger
+Logger <|-- InfoLogger
+Logger <|-- WarnLogger
+Logger <|-- ErrorLogger
+Logger o--> Logger : next
+LoggerManager o--> Logger : chainHead
+Logger ..> LoggerManager : publish() -> notifyObservers()
+
+' ============================================================
+' OBSERVER  -- runtime sink registration
+' ============================================================
+interface LogObserver {
+  + onLog(message: LogMessage): void
+}
+class SinkObserverAdapter {
+  - sink: LogSink
+  + SinkObserverAdapter(sink: LogSink)
+  + onLog(message: LogMessage): void
+  ' ADAPTER: lets a minimal LogSink act as an observer
+  '   without coupling the sink SPI to the observer SPI.
+  ' ISOLATION: try/catch around sink.append() so one
+  '   failing sink never starves the others.
+}
+LogObserver <|.. SinkObserverAdapter
+LoggerManager o--> LogObserver : observers (CopyOnWrite)
+SinkObserverAdapter --> LogSink : wraps
+
+' ============================================================
+' OUTPUT SEAM  -- where bytes physically go
+' ============================================================
+interface LogSink {
+  + name(): String
+  + append(message: LogMessage): void
+  + flush(): void
+  ' Contract: a sink swallows/translates its own exceptions.
+}
+class ConsoleSink {
+  - printLock: Object
+  + append(message: LogMessage): void
+}
+class FileSink {
+  - fileName: String
+  - lines: List<String>   {in-memory mock}
+  + getLines(): List<String>
+}
+class DbSink {
+  - tableName: String
+  - insertedRows: List<String>   {mock INSERTs}
+  + getInsertedRows(): List<String>
+}
+LogSink <|.. ConsoleSink
+LogSink <|.. FileSink
+LogSink <|.. DbSink
+
+' ============================================================
+' CREATION SEAM  -- spec string -> sink instance
+' ============================================================
+class SinkFactory {
+  + create(spec: String): LogSink
+  + createAll(specs: List<String>): List<LogSink>
+  ' spec format: "CONSOLE" | "FILE:<name>" | "DB:<table>"
+  ' New sink = one class + one branch here. Core untouched.
+}
+SinkFactory ..> LogSink : creates
+
+' ============================================================
+' CONFIG  -- immutable snapshot, copy-on-write swapped
+' ============================================================
+class LoggerConfig {
+  - minimumLevel: LogLevel
+  - sinksByLevel: Map<LogLevel, List<LogSink>>
+  - asyncMode: boolean
+  + {static} builder(minimumLevel: LogLevel): Builder
+  + getMinimumLevel(): LogLevel
+  + isAsyncMode(): boolean
+  + sinksFor(level: LogLevel): List<LogSink>
+  + allSinks(): List<LogSink>
+  ' IMMUTABLE: safely published to many reader threads
+  '   without locks; reconfigure() swaps a whole new snapshot.
+}
+class "LoggerConfig.Builder" as ConfigBuilder {
+  + addSink(level: LogLevel, sink: LogSink): Builder
+  + async(enabled: boolean): Builder
+  + build(): LoggerConfig
+}
+LoggerConfig +-- ConfigBuilder
+LoggerManager o--> LoggerConfig : config
+
+' ============================================================
+' MESSAGE + ENRICHMENT
+' ============================================================
+class LogMessage {
+  - level: LogLevel
+  - text: String
+  - timestamp: Instant
+  - threadName: String
+  - caller: String
+  + render(): String
+  ' IMMUTABLE value object: created on caller thread, read by
+  '   the async worker + multiple sink threads. render() is the
+  '   single definition of the on-the-wire line format.
+}
+class MessageEnricher {
+  + enrich(level, caller, text): LogMessage
+  + enrichWithStackCapture(level, text): LogMessage
+  ' Default = explicit caller param (cheap). Stack capture is
+  '   the documented expensive alternative (10-100x).
+}
+MessageEnricher ..> LogMessage : builds
+LoggerManager o--> MessageEnricher
+LoggerManager ..> LogMessage : log() creates via enricher
+
+' ============================================================
+' ASYNC ENGINE  -- bounded queue + single worker
+' ============================================================
+class AsyncAppender {
+  - queue: BlockingQueue<Runnable>   {bounded}
+  - policy: OverflowPolicy
+  - executor: ExecutorService   {single daemon thread}
+  - droppedCount: AtomicLong
+  + submit(task: Runnable): void
+  + shutdown(): void
+  + getDroppedCount(): long
+  ' SINGLE worker => per-sink FIFO ordering.
+  ' BOUNDED queue => no OOM under burst.
+  ' Default DROP_OLDEST: newest evidence survives; gaps are
+  '   counted and visible. Alternatives: DROP_NEWEST, BLOCK.
+}
+enum "AsyncAppender.OverflowPolicy" as OverflowPolicy {
+  DROP_OLDEST
+  DROP_NEWEST
+  BLOCK
+}
+AsyncAppender +-- OverflowPolicy
+LoggerManager o--> AsyncAppender : when asyncMode
+
+' ============================================================
+' LEVELS
+' ============================================================
+enum LogLevel {
+  DEBUG(0)
+  INFO(1)
+  WARN(2)
+  ERROR(3)
+  + getSeverity(): int
+  + isEnabled(minimum: LogLevel): boolean
+  ' severity is DATA on the constant, not ordinal position:
+  '   stable under reordering, O(1) filter.
+}
+
+note bottom of LoggerManager
+  log(level, caller, text):
+    1. FILTER  (cheapest-first: drop before building anything)
+    2. ENRICH  -> immutable LogMessage
+    3. ROUTE   -> chainHead.handle(message)
+    4. DELIVER -> sync inline | async via AsyncAppender
+  Adding a level = +1 enum constant, +1 chain link.
+  Adding a sink  = +1 LogSink impl, +1 SinkFactory branch.
+  Neither touches LoggerManager (Open/Closed Principle).
+end note
+
+note right of AsyncAppender
+  Why single-threaded?
+    Ordering is a property log consumers rely on.
+  Why bounded?
+    An unbounded queue is an OOM with extra steps.
+  Scale-up: shard workers by sink/thread, keep
+    per-shard ordering.
+end note
+
+@enduml

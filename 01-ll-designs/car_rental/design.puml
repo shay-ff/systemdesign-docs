@@ -1,0 +1,185 @@
+@startuml
+' Car Rental System - class diagram (Java 11, no packages)
+
+class Interval {
+  - start: LocalDate
+  - end: LocalDate
+  + Interval(start, end)
+  + overlaps(other: Interval): boolean
+  + days(): long
+  + contains(date: LocalDate): boolean
+  + getStart(): LocalDate
+  + getEnd(): LocalDate
+}
+
+enum VehicleType {
+  CAR
+  SUV
+  BIKE
+  TRUCK
+}
+
+enum ReservationStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+class Location {
+  - city: String
+  - pincode: String
+  - address: String
+  + getCity(): String
+}
+
+class Vehicle <<abstract>> {
+  # vehicleId: String
+  # licensePlate: String
+  # type: VehicleType
+  # perDayRate: double
+  # dailyKmAllowance: int
+  + getVehicleId(): String
+  + getVehicleType(): VehicleType
+  + getPerDayRate(): double
+  + getDailyKmAllowance(): int
+}
+
+class Car extends Vehicle
+class Suv extends Vehicle
+class Bike extends Vehicle
+class Truck extends Vehicle
+
+class Customer {
+  - customerId: String
+  - name: String
+  - drivingLicence: String
+}
+
+class VehicleInventory {
+  - byType: Map<VehicleType, List<Vehicle>>
+  + addVehicle(v: Vehicle): void
+  + removeVehicle(vehicleId: String): Vehicle
+  + findByType(type: VehicleType): List<Vehicle>
+  + totalVehicles(): int
+}
+
+class Store {
+  - storeId: String
+  - location: Location
+  - inventory: VehicleInventory
+  - reservations: List<Reservation>
+  + isAvailable(v: Vehicle, window: Interval): boolean
+  + conflictingReservation(v: Vehicle, window: Interval): Reservation
+  + addReservation(r: Reservation): void
+}
+
+class Reservation {
+  - reservationId: String
+  - vehicle: Vehicle
+  - customer: Customer
+  - rentalWindow: Interval
+  - status: ReservationStatus
+  - bookedKmAllowance: int
+  - bill: Bill
+  + markInProgress(): void
+  + complete(bill: Bill): void
+  + cancel(): void
+  + isActive(): boolean
+  ..
+  + Bill {
+    - days: long
+    - baseAmount: double
+    - kmOverage: double
+    - latePenalty: double
+    - total: double
+    - lines: List<String>
+  }
+}
+
+interface PricingStrategy {
+  + calculate(v: Vehicle, window: Interval, actualKm: int): Bill
+}
+
+class PerDayPricingStrategy implements PricingStrategy {
+  - kmOverageRate: double
+  + calculate(...): Bill
+}
+
+class LatePenaltyPricingStrategy implements PricingStrategy {
+  - base: PricingStrategy
+  - lateFeePerDay: double
+  - flatLateFee: double
+  + calculate(...): Bill
+}
+
+class PaymentService {
+  - payments: Map<String, Payment>
+  + charge(r: Reservation, amount: double): Payment
+  + refund(r: Reservation, amount: double): Payment
+}
+
+class Payment {
+  - paymentId: String
+  - reservationId: String
+  - amount: double
+  - kind: String
+}
+
+class BookingService {
+  - stores: List<Store>
+  - pricing: PricingStrategy
+  - payments: PaymentService
+  + findStores(city: String): List<Store>
+  + searchAvailable(store: Store, type: VehicleType, window: Interval): List<Vehicle>
+  + book(store: Store, vehicle: Vehicle, customer: Customer, window: Interval): Reservation
+  + pickup(reservationId: String): void
+  + returnVehicle(reservationId: String, actualKm: int, actualReturn: LocalDate): Reservation
+  + cancel(reservationId: String): void
+}
+
+' Relationships
+BookingService "1" o-- "many" Store : operates
+Store "1" *-- "1" VehicleInventory : composition
+Store "1" o-- "1" Location : located in
+VehicleInventory "1" o-- "many" Vehicle : indexes by type
+Store "1" o-- "many" Reservation : reservation log
+Reservation "many" --> "1" Vehicle : books
+Reservation "many" --> "1" Customer : rented by
+Reservation "1" *-- "1" Interval : rental window
+Reservation ..> ReservationStatus
+Vehicle ..> VehicleType
+BookingService ..> PricingStrategy : uses (strategy)
+BookingService ..> PaymentService : uses
+LatePenaltyPricingStrategy o-- "1" PricingStrategy : decorates base
+PaymentService "1" o-- "many" Payment
+Reservation "1" o-- "many" Payment : charge / refund
+
+note bottom of BookingService
+  The crux: book() must reject any window whose
+  Interval.overlaps() returns true against the
+  vehicle's active (SCHEDULED/IN_PROGRESS)
+  reservations in this store.
+  O(R) scan per booking; upgrade path:
+  sorted list + binary search, or interval tree
+  (O(log R + k)) at production scale.
+end note
+
+note right of Interval
+  Half-open rental window [start, end):
+  start = pickup day, end = drop-off day
+  (vehicle free again ON the end day).
+  Overlap rule (strict inequality):
+  this.start < other.end &&
+  other.start < this.end
+  Touching windows (drop-off day == next
+  pickup day) are ALLOWED — back-to-back
+  bookings work.
+end note
+
+note bottom of Vehicle
+  Adding Bike/Truck requires no changes to
+  BookingService, Store, or VehicleInventory
+  (Open/Closed Principle).
+end note
+@enduml

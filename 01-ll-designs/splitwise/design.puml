@@ -1,0 +1,171 @@
+@startuml
+title Splitwise — Class Diagram
+
+' ---- Core domain ----
+class User {
+  - id: String
+  - name: String
+  - email: String
+  + getId(): String
+  ' equality on id only; NO balance fields — balances live in the ledger
+}
+
+class Group {
+  - id: String
+  - name: String
+  - memberIds: Set<String>
+  - expenses: List<Expense>
+  + addMember(userId: String): void
+  + removeMember(userId: String, balances: BalanceService): void
+  ' removal blocked while open balances exist; membership validated per expense
+  + addExpense(expense: Expense): void
+  + hasMember(userId: String): boolean
+}
+
+' ---- Split hierarchy (data, not strategies) ----
+abstract class Split {
+  # userId: String
+  + computeShareInPaise(totalInPaise: long): long
+  + describe(): String
+  + {static} formatRupees(paise: long): String
+  ' money is long paise in the core; BigDecimal only at the edges
+}
+
+class EqualSplit {
+  - shares: int = 1
+  + computeShareInPaise(total: long): long
+  ' intentionally THROWS: an equal share's amount depends on the other splits
+}
+
+class PercentSplit {
+  - percentBasisPoints: int
+  + {static} PERCENT_SCALE: int = 10000
+  + computeShareInPaise(total: long): long
+  ' integer basis points: 3333 = 33.33% exactly
+}
+
+class ExactSplit {
+  - amountInPaise: long
+  + computeShareInPaise(total: long): long
+  ' self-contained: returns its own amount
+}
+
+' ---- Expense ----
+class Expense {
+  - id: String
+  - description: String
+  - amountInPaise: long
+  - paidByUserId: String
+  - splits: List<Split>
+  + Expense(id, description, amountRupees: BigDecimal, paidByUserId, splits)
+  ' immutable + defensive copies; cross-split validation in constructor:
+  ' no duplicates, percents sum to exactly 100%, exacts sum to total, no mixing
+  + {static} equalAmong(userIds: String...): List<Split>
+  + {static} percentAmong(userPercentPairs: Object...): List<Split>
+}
+
+' ---- Services ----
+class ExpenseService {
+  + computeShares(expense: Expense): Map<String, Long>
+  ' pure function object; equal splits: floor all but last, last absorbs the remainder
+  + deriveTransfers(expense: Expense): List<Transfer>
+  ' shares -> debtor->payer edges, guaranteed to sum back to the total
+}
+
+class BalanceService {
+  - groupToPairBalances: Map<String, TreeMap<String, Long>>
+  - lock: ReentrantLock
+  + applyTransfer(groupId, fromUserId, toUserId, amountInPaise: long): void
+  ' canonical signed key "aId|bId" (aId < bId): +a owes b, -b owes a, 0 removed
+  + applyTransfers(groupId, transfers: List<Transfer>): void
+  + recordSettlement(groupId, fromUserId, toUserId, amountInPaise: long): void
+  ' real payment = opposite bookkeeping direction; pair shrinks or flips
+  + getNetBalances(groupId): Map<String, Long>
+  + getPairwiseBalances(groupId): List<Transfer>
+  + userHasOpenBalanceInGroup(groupId, userId): boolean
+  + settleUpGroup(groupId): void
+  ' clears pairwise residue ONLY when every net is zero (offsetting cycles)
+}
+
+class SimplifyDebtService {
+  + simplify(netBalances: Map<String, Long>): List<Transfer>
+  ' greedy min-cash-flow: max-heap of creditors vs min-heap of debtors;
+  ' sum-zero invariant validated; <= n-1 transfers; O(n log n)
+  - UserNet
+}
+
+class Transfer {
+  - expenseId: String
+  - fromUserId: String
+  - toUserId: String
+  - amountInPaise: long
+  ' one value class for both raw per-expense edges and settlement suggestions
+}
+
+class SplitwiseService {
+  - userRepository: UserRepository
+  - groupRepository: GroupRepository
+  - expenseService: ExpenseService
+  - balanceService: BalanceService
+  - simplifyDebtService: SimplifyDebtService
+  + addUser(userId, name, email): User
+  + createGroup(groupId, groupName, memberUserIds: String...): Group
+  + addExpense(groupId, expense: Expense): Expense
+  + getNetBalances(groupId): Map<String, Long>
+  + getPairwiseBalances(groupId): List<Transfer>
+  + suggestSettlement(groupId): List<Transfer>
+  + recordSettlement(groupId, fromUserId, toUserId, amountInPaise: long): void
+  + settleUpGroup(groupId): void
+  ' facade: validate via group -> compute shares -> persist -> book transfers
+}
+
+' ---- Repositories (persistence seam) ----
+interface UserRepository {
+  + save(user: User): User
+  + findById(userId: String): Optional<User>
+  + findAll(): Collection<User>
+}
+
+interface GroupRepository {
+  + save(group: Group): Group
+  + findById(groupId: String): Optional<Group>
+}
+
+class InMemoryUserRepository {
+  - users: ConcurrentHashMap<String, User>
+  ' lock-free reads; putIfAbsent rejects duplicate ids
+}
+
+class InMemoryGroupRepository {
+  - groups: ConcurrentHashMap<String, Group>
+}
+
+' ---- Relationships ----
+Group o-- "many" User : by id, via memberIds
+Group o-- "many" Expense : owns expense history
+Expense o-- "2..many" Split : defensive-copied list
+
+Split <|-- EqualSplit
+Split <|-- PercentSplit
+Split <|-- ExactSplit
+
+SplitwiseService o-- UserRepository
+SplitwiseService o-- GroupRepository
+SplitwiseService o-- ExpenseService
+SplitwiseService o-- BalanceService
+SplitwiseService o-- SimplifyDebtService
+
+ExpenseService ..> Expense : computes from
+ExpenseService ..> Split
+ExpenseService ..> Transfer : produces
+BalanceService ..> Transfer : consumes and produces
+BalanceService ..> Group : removeMember asks the ledger
+SimplifyDebtService ..> Transfer : produces suggestions
+Group ..> BalanceService : removal guard
+
+UserRepository <|.. InMemoryUserRepository
+GroupRepository <|.. InMemoryGroupRepository
+UserRepository ..> User : stores
+GroupRepository ..> Group : stores
+
+@enduml

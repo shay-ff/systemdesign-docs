@@ -1,0 +1,105 @@
+@startuml
+title Snake & Ladder — Class Diagram
+
+' ---- Core domain ----
+class Board {
+  - dimension: int
+  - finishPosition: int
+  - consequences: Map<Integer, MovementConsequence>
+  + Board(dimension: int, snakesAndLadders: List<MovementConsequence>)
+  + resolve(position: int): int
+  + hasConsequenceAt(position: int): boolean
+  + getFinishPosition(): int
+  + prettyPrint(): String
+  ' validation: direction, bounds, no overlap, no cycles — fail fast at construction
+}
+
+class MovementConsequence {
+  - start: int
+  - end: int
+  - direction: Direction
+  + jump(from: int): int
+  + describe(): String
+  ' one class, not Snake/Ladder subclasses: identical behaviour, only data differs
+}
+
+enum Direction {
+  SNAKE
+  LADDER
+}
+
+class Player {
+  - name: String
+  - position: int = 1
+  + moveTo(position: int): void
+  + getName(): String
+  + getPosition(): int
+}
+
+' ---- Dice hierarchy (decorator) ----
+interface Dice {
+  + roll(): int
+  + describe(): String
+}
+
+class StandardDice {
+  - random: Random
+  - faces: int
+  + StandardDice(seed: long)
+  + roll(): int
+}
+
+class CrookedDiceDecorator {
+  - wrapped: Dice
+  ' never shows 6: re-roll while wrapped die says 6
+  + CrookedDiceDecorator(wrapped: Dice)
+  + roll(): int
+}
+
+' ---- Win rule (strategy) ----
+interface WinRule {
+  + destination(current: int, roll: int, finish: int): int
+  + describe(): String
+}
+
+class ExactRollWinRule {
+  ' exact roll to finish; overshoot = no move
+  + destination(current: int, roll: int, finish: int): int
+}
+
+class BounceBackWinRule {
+  ' reflect excess off the finish line
+  + destination(current: int, roll: int, finish: int): int
+}
+
+' ---- Orchestrator ----
+class Game {
+  - board: Board
+  - players: List<Player>
+  - dice: Dice
+  - winRule: WinRule
+  - currentPlayerIndex: int
+  - turnCount: int
+  + Game(board: Board, players: List<Player>, dice: Dice, winRule: WinRule)
+  + playTurn(): Player
+  + playUntilWinner(): Player
+  ' no game-specific branching: snakes/ladders/dice/win all injected
+}
+
+' ---- Relationships ----
+Game *-- "many" Player
+Game o-- Board
+Game o-- Dice
+Game o-- WinRule
+
+Board o-- "many" MovementConsequence : sparse map 1..N^2
+MovementConsequence .. Direction
+
+Dice <|.. StandardDice
+Dice <|.. CrookedDiceDecorator
+CrookedDiceDecorator o-- Dice : decorates any Dice
+
+WinRule <|.. ExactRollWinRule
+WinRule <|.. BounceBackWinRule
+
+@enduml

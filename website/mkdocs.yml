@@ -1,0 +1,289 @@
+site_name: System Design Docs
+site_description: Interview-oriented system design learning guide — foundations, LLD, HLD, interview prep, and study plans.
+repo_url: https://github.com/shay-ff/systemdesign-docs
+repo_name: shay-ff/systemdesign-docs
+
+docs_dir: docs
+site_dir: ../systemdesign-docs-site
+
+exclude_docs: |
+  DEPLOY.md
+  **/*.java
+  **/*.py
+  **/*.go
+  **/*.cpp
+  **/*.hpp
+  **/*.c
+  **/*.h
+  **/*.html
+  **/Dockerfile
+  **/Dockerfile.*
+  **/docker-compose*.yml
+  **/Makefile
+  **/go.mod
+  **/go.sum
+  **/prometheus.yml
+  **/requirements.txt
+  01-ll-designs/**/solutions/
+  01-ll-designs/**/src/
+  03-implementations/**/load-test/
+  03-implementations/**/benchmarks/
+  03-implementations/**/clients/
+  03-implementations/**/examples/
+  assets/README.txt
+
+theme:
+  name: material
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Home: README.md
+  - Full Navigation: NAVIGATION.md
+  - Foundations:
+      - 00-foundations/README.md
+      - Core Concepts: 00-foundations/concepts.md
+      - Scalability: 00-foundations/scalability.md
+      - Load Balancing: 00-foundations/load-balancing.md
+      - Caching Strategies: 00-foundations/caching-strategies.md
+      - Database Basics: 00-foundations/database-basics.md
+      - CAP Theorem: 00-foundations/cap-theorem.md
+      - Consistency vs Availability: 00-foundations/consistency-vs-availability.md
+      - Design Patterns: 00-foundations/design-patterns.md
+      - Cheatsheet: 00-foundations/cheatsheet.md
+      - Glossary: 00-foundations/glossary.md
+      - FAQs: 00-foundations/faqs.md
+
+  - Low-Level Design:
+      - 01-ll-designs/README.md
+      - ATM:
+          - 01-ll-designs/atm/README.md
+          - Explanation: 01-ll-designs/atm/explanation.md
+      - Bloom Filter:
+          - 01-ll-designs/bloom_filter/README.md
+          - Explanation: 01-ll-designs/bloom_filter/explanation.md
+      - BookMyShow:
+          - 01-ll-designs/bookmyshow/README.md
+          - Explanation: 01-ll-designs/bookmyshow/explanation.md
+      - Calendar Scheduler:
+          - 01-ll-designs/calendar_scheduler/README.md
+          - Explanation: 01-ll-designs/calendar_scheduler/explanation.md
+      - Car Rental:
+          - 01-ll-designs/car_rental/README.md
+          - Explanation: 01-ll-designs/car_rental/explanation.md
+      - Consistent Hashing:
+          - 01-ll-designs/consistent_hashing/README.md
+          - Explanation: 01-ll-designs/consistent_hashing/explanation.md
+      - Elevator:
+          - 01-ll-designs/elevator/README.md
+          - Explanation: 01-ll-designs/elevator/explanation.md
+      - Logger Framework:
+          - 01-ll-designs/logger_framework/README.md
+          - Explanation: 01-ll-designs/logger_framework/explanation.md
+      - LRU Cache:
+          - 01-ll-designs/lru_cache/README.md
+          - Explanation: 01-ll-designs/lru_cache/explanation.md
+      - Message Queue:
+          - 01-ll-designs/message_queue/README.md
+          - Explanation: 01-ll-designs/message_queue/explanation.md
+      - Notification System:
+          - 01-ll-designs/notification_system/README.md
+          - Explanation: 01-ll-designs/notification_system/explanation.md
+      - Parking Lot:
+          - 01-ll-designs/parking_lot/README.md
+          - Explanation: 01-ll-designs/parking_lot/explanation.md
+      - Rate Limiter:
+          - 01-ll-designs/rate_limiter/README.md
+          - Explanation: 01-ll-designs/rate_limiter/explanation.md
+      - Snake and Ladder:
+          - 01-ll-designs/snake_ladder/README.md
+          - Explanation: 01-ll-designs/snake_ladder/explanation.md
+      - Splitwise:
+          - 01-ll-designs/splitwise/README.md
+          - Explanation: 01-ll-designs/splitwise/explanation.md
+      - URL Shortener:
+          - 01-ll-designs/url_shortener/README.md
+      - Vending Machine:
+          - 01-ll-designs/vending_machine/README.md
+          - Explanation: 01-ll-designs/vending_machine/explanation.md
+
+  - High-Level Design:
+      - 02-hl-designs/README.md
+      - Quick Reference: 02-hl-designs/hld-quick-reference.md
+      - Chat System:
+          - 02-hl-designs/chat_system/README.md
+          - Requirements: 02-hl-designs/chat_system/requirements.md
+          - API Design: 02-hl-designs/chat_system/api-design.md
+          - Database Schema: 02-hl-designs/chat_system/database-schema.md
+          - Solution: 02-hl-designs/chat_system/solution.md
+          - Scaling Strategy: 02-hl-designs/chat_system/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/chat_system/tradeoffs.md
+      - LLM Serving Platform:
+          - 02-hl-designs/llm_serving_platform/README.md
+          - Requirements: 02-hl-designs/llm_serving_platform/requirements.md
+          - API Design: 02-hl-designs/llm_serving_platform/api-design.md
+          - Database Schema: 02-hl-designs/llm_serving_platform/database-schema.md
+          - Solution: 02-hl-designs/llm_serving_platform/solution.md
+          - Scaling Strategy: 02-hl-designs/llm_serving_platform/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/llm_serving_platform/tradeoffs.md
+      - Netflix Streaming:
+          - 02-hl-designs/netflix_streaming/README.md
+          - Requirements: 02-hl-designs/netflix_streaming/requirements.md
+          - API Design: 02-hl-designs/netflix_streaming/api-design.md
+          - Database Schema: 02-hl-designs/netflix_streaming/database-schema.md
+          - Solution: 02-hl-designs/netflix_streaming/solution.md
+          - Scaling Strategy: 02-hl-designs/netflix_streaming/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/netflix_streaming/tradeoffs.md
+      - Payment Gateway:
+          - 02-hl-designs/payment_gateway/README.md
+          - Requirements: 02-hl-designs/payment_gateway/requirements.md
+          - API Design: 02-hl-designs/payment_gateway/api-design.md
+          - Database Schema: 02-hl-designs/payment_gateway/database-schema.md
+          - Solution: 02-hl-designs/payment_gateway/solution.md
+          - Scaling Strategy: 02-hl-designs/payment_gateway/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/payment_gateway/tradeoffs.md
+      - Twitter Clone:
+          - 02-hl-designs/twitter_clone/README.md
+          - Requirements: 02-hl-designs/twitter_clone/requirements.md
+          - API Design: 02-hl-designs/twitter_clone/api-design.md
+          - Database Schema: 02-hl-designs/twitter_clone/database-schema.md
+          - Solution: 02-hl-designs/twitter_clone/solution.md
+          - Scaling Strategy: 02-hl-designs/twitter_clone/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/twitter_clone/tradeoffs.md
+      - Uber System:
+          - 02-hl-designs/uber_system/README.md
+          - Requirements: 02-hl-designs/uber_system/requirements.md
+          - API Design: 02-hl-designs/uber_system/api-design.md
+          - Database Schema: 02-hl-designs/uber_system/database-schema.md
+          - Solution: 02-hl-designs/uber_system/solution.md
+          - Scaling Strategy: 02-hl-designs/uber_system/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/uber_system/tradeoffs.md
+      - URL Shortener:
+          - 02-hl-designs/url_shortener/README.md
+          - Requirements: 02-hl-designs/url_shortener/requirements.md
+          - API Design: 02-hl-designs/url_shortener/api-design.md
+          - Database Schema: 02-hl-designs/url_shortener/database-schema.md
+          - Solution: 02-hl-designs/url_shortener/solution.md
+          - Scaling Strategy: 02-hl-designs/url_shortener/scaling-strategy.md
+      - YouTube:
+          - 02-hl-designs/youtube/README.md
+          - Requirements: 02-hl-designs/youtube/requirements.md
+          - API Design: 02-hl-designs/youtube/api-design.md
+          - Database Schema: 02-hl-designs/youtube/database-schema.md
+          - Solution: 02-hl-designs/youtube/solution.md
+          - Scaling Strategy: 02-hl-designs/youtube/scaling-strategy.md
+          - Trade-offs: 02-hl-designs/youtube/tradeoffs.md
+
+  - Implementations:
+      - 03-implementations/README.md
+      - Cache Server:
+          - 03-implementations/cache-server/README.md
+          - API Docs: 03-implementations/cache-server/api-docs.md
+      - Distributed Lock:
+          - 03-implementations/distributed-lock/README.md
+      - Rate Limiter Service:
+          - 03-implementations/rate-limiter-service/README.md
+          - API Docs: 03-implementations/rate-limiter-service/api-docs.md
+      - Simple Message Broker:
+          - 03-implementations/simple-message-broker/README.md
+
+  - Interview Prep:
+      - 04-interview-prep/README.md
+      - Frameworks: 04-interview-prep/frameworks.md
+      - LLD Round Guide: 04-interview-prep/lld-round-guide.md
+      - Machine Coding Guide: 04-interview-prep/machine-coding-guide.md
+      - LLD Patterns Cheatsheet: 04-interview-prep/lld-patterns-cheatsheet.md
+      - Most Asked Questions: 04-interview-prep/most_asked_questions.md
+      - Mock Interviews:
+          - 04-interview-prep/mock-interviews/README.md
+          - Evaluation Rubric: 04-interview-prep/mock-interviews/evaluation-rubrics/technical-rubric.md
+          - Junior — URL Shortener: 04-interview-prep/mock-interviews/junior-level/url-shortener.md
+          - Mid — LLD Splitwise: 04-interview-prep/mock-interviews/mid-level/lld-splitwise.md
+          - Mid — Social Feed: 04-interview-prep/mock-interviews/mid-level/social-feed.md
+          - Senior — Payment System: 04-interview-prep/mock-interviews/senior-level/payment-system.md
+      - Solutions:
+          - 04-interview-prep/solutions/README.md
+          - Sample Answers: 04-interview-prep/solutions/sample-answers.md
+
+  - Study Plan:
+      - 05-study-plan/README.md
+      - Roadmap: 05-study-plan/roadmap.md
+      - 6-Week Study Plan: 05-study-plan/study_plan.md
+      - 4-Week Crunch Plan: 05-study-plan/crunch-plan.md
+      - Milestones: 05-study-plan/milestones.md
+      - References: 05-study-plan/references.md
+  - Visual Guides:
+      - assets/diagrams/README.md
+      - Style Guide: assets/diagrams/style-guide.md
+      - Component Icons: assets/diagrams/icons/components.md
+      - Patterns:
+          - Caching Patterns: assets/diagrams/patterns/caching-patterns.md
+          - Database Patterns: assets/diagrams/patterns/database-patterns.md
+      - Templates:
+          - Basic Web App: assets/diagrams/templates/basic-web-app.md
+          - Event-Driven Architecture: assets/diagrams/templates/event-driven-architecture.md
+          - Microservices Pattern: assets/diagrams/templates/microservices-pattern.md
+      - Visual Aids:
+          - CAP Theorem Infographic: assets/visual-aids/cap-theorem-infographic.md
+          - Consistency Models Chart: assets/visual-aids/consistency-models-chart.md
+          - Progress Tracking: assets/visual-aids/progress-tracking-visualizations.md
+          - Technology Comparison Charts: assets/visual-aids/technology-comparison-charts.md
+  - Contributing: CONTRIBUTING.md

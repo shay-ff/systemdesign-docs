@@ -1,0 +1,137 @@
+@startuml YouTube System Architecture
+
+!define RECTANGLE class
+
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+title YouTube System Architecture
+
+' External actors
+actor "Creator" as creator
+actor "Viewer" as viewer
+actor "Advertiser" as advertiser
+actor "Moderator" as moderator
+
+' Load balancers and API Gateway
+rectangle "Global Load Balancer" as glb #lightblue
+rectangle "API Gateway" as gateway #lightblue
+
+' Core microservices
+rectangle "User Service" as userSvc #lightgreen
+rectangle "Video Service" as videoSvc #lightgreen
+rectangle "Upload Service" as uploadSvc #lightgreen
+rectangle "Streaming Service" as streamSvc #lightgreen
+rectangle "Comment Service" as commentSvc #lightgreen
+rectangle "Search Service" as searchSvc #lightgreen
+rectangle "Recommendation Service" as recoSvc #lightgreen
+rectangle "Analytics Service" as analyticsSvc #lightgreen
+rectangle "Notification Service" as notifSvc #lightgreen
+rectangle "Monetization Service" as monetSvc #lightgreen
+
+' Processing services
+rectangle "Video Processing Pipeline" as videoProc #orange
+rectangle "Content Moderation Service" as moderationSvc #orange
+rectangle "Transcoding Service" as transcodeSvc #orange
+rectangle "ML Pipeline" as mlPipeline #orange
+rectangle "Live Streaming Service" as liveSvc #orange
+
+' Storage systems
+database "User Database\n(PostgreSQL)" as userDB #yellow
+database "Video Metadata DB\n(PostgreSQL)" as videoDB #yellow
+database "Comment Database\n(Cassandra)" as commentDB #yellow
+database "Analytics DB\n(BigQuery)" as analyticsDB #yellow
+database "Search Index\n(Elasticsearch)" as searchDB #yellow
+database "Cache Layer\n(Redis)" as cache #yellow
+database "Video Storage\n(Google Cloud Storage)" as videoStorage #yellow
+database "Thumbnail Storage\n(CDN)" as thumbStorage #yellow
+
+' External systems
+cloud "Global CDN\n(YouTube CDN)" as cdn #lightcoral
+cloud "Ad Serving Platform" as adPlatform #lightcoral
+cloud "ML Platform\n(TensorFlow)" as mlPlatform #lightcoral
+cloud "Message Queue\n(Pub/Sub)" as messageQueue #lightcoral
+cloud "Content Moderation AI" as moderationAI #lightcoral
+
+' User interactions
+creator --> glb : Upload Videos
+viewer --> glb : Watch Videos
+advertiser --> glb : Manage Ads
+moderator --> glb : Review Content
+
+' Load balancing
+glb --> gateway : Route Requests
+
+' API Gateway routing
+gateway --> userSvc : User Management
+gateway --> videoSvc : Video Operations
+gateway --> uploadSvc : Video Uploads
+gateway --> streamSvc : Video Streaming
+gateway --> commentSvc : Comments & Social
+gateway --> searchSvc : Search Queries
+gateway --> recoSvc : Recommendations
+gateway --> monetSvc : Monetization
+
+' Service interactions
+userSvc --> userDB : User Data
+userSvc --> cache : User Sessions
+
+videoSvc --> videoDB : Video Metadata
+videoSvc --> videoStorage : Video Files
+videoSvc --> thumbStorage : Thumbnails
+
+uploadSvc --> videoProc : Process Videos
+uploadSvc --> videoStorage : Store Raw Videos
+uploadSvc --> messageQueue : Upload Events
+
+streamSvc --> cdn : Serve Videos
+streamSvc --> cache : Streaming State
+streamSvc --> analyticsDB : View Events
+
+commentSvc --> commentDB : Comments Data
+commentSvc --> cache : Comment Cache
+commentSvc --> moderationSvc : Content Review
+
+searchSvc --> searchDB : Search Index
+searchSvc --> cache : Search Cache
+
+recoSvc --> mlPipeline : Get Recommendations
+recoSvc --> cache : Cache Recommendations
+recoSvc --> analyticsDB : User Behavior
+
+videoProc --> transcodeSvc : Transcode Videos
+videoProc --> moderationSvc : Content Analysis
+videoProc --> messageQueue : Processing Events
+
+moderationSvc --> moderationAI : AI Analysis
+moderationSvc --> videoDB : Moderation Results
+
+transcodeSvc --> videoStorage : Store Transcoded Videos
+transcodeSvc --> cdn : Distribute Content
+
+mlPipeline --> mlPlatform : Train Models
+mlPipeline --> analyticsDB : Training Data
+
+analyticsSvc --> analyticsDB : Store Events
+analyticsSvc --> messageQueue : Consume Events
+
+monetSvc --> adPlatform : Ad Serving
+monetSvc --> analyticsDB : Revenue Data
+
+liveSvc --> cdn : Live Stream Distribution
+liveSvc --> messageQueue : Live Events
+
+notifSvc --> messageQueue : Consume Notifications
+notifSvc --> userSvc : User Preferences
+
+' CDN content delivery
+cdn --> videoStorage : Origin Content
+cdn --> viewer : Cached Content
+
+' Message flow
+messageQueue --> recoSvc : User Events
+messageQueue --> analyticsSvc : System Events
+messageQueue --> notifSvc : Notification Events
+messageQueue --> moderationSvc : Content Events
+
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+class LRUCache {
+  - capacity : int
+  - map : unordered_map<int, Node*>
+  - head, tail : Node*
+  + get(key:int) : int
+  + put(key:int, value:int) : void
+}
+class Node {
+  - key:int
+  - value:int
+  - prev, next : Node*
+}
+LRUCache *-- Node
+@enduml

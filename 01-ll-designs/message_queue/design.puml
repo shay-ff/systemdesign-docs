@@ -1,0 +1,122 @@
+@startuml Message Queue Architecture
+
+!define RECTANGLE class
+
+package "Message Queue System" {
+    
+    RECTANGLE Message {
+        +id: string
+        +topic: string
+        +payload: string
+        +timestamp: long
+        +headers: map<string, string>
+    }
+    
+    RECTANGLE Topic {
+        +name: string
+        +messages: queue<Message>
+        +subscribers: list<Consumer>
+        +maxSize: int
+        +addMessage(message: Message)
+        +subscribe(consumer: Consumer)
+        +unsubscribe(consumer: Consumer)
+        +deliverMessages()
+    }
+    
+    RECTANGLE Producer {
+        +id: string
+        +messageQueue: MessageQueue
+        +publish(topic: string, payload: string)
+        +publishWithHeaders(topic: string, payload: string, headers: map)
+    }
+    
+    RECTANGLE Consumer {
+        +id: string
+        +subscribedTopics: set<string>
+        +messageHandler: function
+        +messageQueue: MessageQueue
+        +subscribe(topic: string)
+        +unsubscribe(topic: string)
+        +onMessage(message: Message)
+    }
+    
+    RECTANGLE MessageQueue {
+        +topics: map<string, Topic>
+        +producers: list<Producer>
+        +consumers: list<Consumer>
+        +createTopic(name: string): Topic
+        +deleteTopic(name: string)
+        +publish(topic: string, message: Message)
+        +subscribe(consumer: Consumer, topic: string)
+        +unsubscribe(consumer: Consumer, topic: string)
+        +getTopicStats(topic: string): Stats
+    }
+    
+    RECTANGLE Stats {
+        +messageCount: long
+        +subscriberCount: int
+        +avgMessageSize: double
+        +throughput: double
+    }
+}
+
+' Relationships
+MessageQueue ||--o{ Topic : manages
+Topic ||--o{ Message : contains
+Topic ||--o{ Consumer : notifies
+Producer }o--|| MessageQueue : publishes to
+Consumer }o--|| MessageQueue : subscribes to
+MessageQueue ||--o{ Stats : provides
+
+' Sequence flow
+note right of Producer : 1. Publish message\nto topic
+note right of MessageQueue : 2. Route message\nto topic queue
+note right of Topic : 3. Add message\nto queue
+note right of Topic : 4. Notify all\nsubscribers
+note right of Consumer : 5. Process\nmessage
+
+@enduml
+
+@startuml Message Flow Sequence
+
+participant Producer
+participant MessageQueue
+participant Topic
+participant Consumer1
+participant Consumer2
+
+Producer -> MessageQueue: publish("orders", message)
+MessageQueue -> Topic: addMessage(message)
+Topic -> Topic: enqueue(message)
+
+loop for each subscriber
+    Topic -> Consumer1: onMessage(message)
+    Topic -> Consumer2: onMessage(message)
+end
+
+Consumer1 -> Consumer1: processMessage(message)
+Consumer2 -> Consumer2: processMessage(message)
+
+@enduml
+
+@startuml Subscription Management
+
+participant Consumer
+participant MessageQueue
+participant Topic
+
+Consumer -> MessageQueue: subscribe("orders")
+MessageQueue -> Topic: subscribe(consumer)
+Topic -> Topic: addSubscriber(consumer)
+
+note right of Topic: Consumer now receives\nall new messages
+
+Producer -> MessageQueue: publish("orders", message)
+MessageQueue -> Topic: addMessage(message)
+Topic -> Consumer: onMessage(message)
+
+Consumer -> MessageQueue: unsubscribe("orders")
+MessageQueue -> Topic: unsubscribe(consumer)
+Topic -> Topic: removeSubscriber(consumer)
+
+@enduml

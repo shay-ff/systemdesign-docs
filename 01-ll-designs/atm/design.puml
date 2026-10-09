@@ -1,0 +1,235 @@
+@startuml
+' ATM System - class diagram (Java 11, no packages)
+
+interface AtmState {
+  + getName(): String
+  + insertCard(card: Card, atm: Atm): AtmState
+  + enterPin(pin: String, atm: Atm): AtmState
+  + selectTransaction(type: TransactionType, atm: Atm): AtmState
+  + enterAmount(amount: long, atm: Atm): AtmState
+  + ejectCard(atm: Atm): AtmState
+}
+
+class IdleState {
+  {static} INSTANCE: IdleState
+  + insertCard(card, atm): AtmState
+}
+class CardInsertedState {
+  {static} INSTANCE: CardInsertedState
+  + enterPin(pin, atm): AtmState
+  + ejectCard(atm): AtmState
+}
+class PinVerifiedState {
+  {static} INSTANCE: PinVerifiedState
+  + selectTransaction(type, atm): AtmState
+  + ejectCard(atm): AtmState
+}
+class TransactionSelectedState {
+  {static} INSTANCE: TransactionSelectedState
+  + enterAmount(amount, atm): AtmState
+  + ejectCard(atm): AtmState
+}
+class DispensingState {
+  {static} INSTANCE: DispensingState
+  + selectTransaction(type, atm): AtmState
+  + enterAmount(amount, atm): AtmState
+  + ejectCard(atm): AtmState
+}
+
+IdleState ..up.|> AtmState
+CardInsertedState ..up.|> AtmState
+PinVerifiedState ..up.|> AtmState
+TransactionSelectedState ..up.|> AtmState
+DispensingState ..up.|> AtmState
+
+enum TransactionType {
+  WITHDRAWAL
+  DEPOSIT
+  BALANCE_INQUIRY
+}
+
+enum AtmResult {
+  APPROVED
+  INSUFFICIENT_FUNDS
+  INVALID_PIN
+  CARD_BLOCKED
+  CARD_CAPTURED
+  DISPENSER_SHORTAGE
+  INVALID_AMOUNT
+}
+
+class Card {
+  - cardNumber: String
+  - pin: String
+  - linkedAccountId: String
+  - blocked: boolean
+  + matchesPin(candidate: String): boolean
+  + block(): void
+  + isBlocked(): boolean
+  + last4(): String
+}
+
+class Account {
+  - accountId: String
+  - holderName: String
+  - balanceInPaise: long
+  - lock: ReentrantLock
+  + tryDebit(amountInPaise: long): boolean
+  + credit(amountInPaise: long): void
+  + getBalance(): long
+  {static} + formatRupees(paise: long): String
+}
+
+interface BankBackend {
+  + verifyPinAndFetchBalance(cardNumber, pin): long
+  + fetchAccount(cardNumber): Account
+  + withdraw(cardNumber, amountInPaise): long
+  + deposit(cardNumber, amountInPaise): long
+  + blockCard(cardNumber): void
+}
+
+class InMemoryBankBackend {
+  - cards: Map<String, Card>
+  - accounts: Map<String, Account>
+  + register(card, account): void
+}
+
+InMemoryBankBackend ..up.|> BankBackend
+
+class CashDispenser {
+  - noteInventory: Map<Integer, Integer>
+  + stock(denomination, count): void
+  + canDispense(amountInPaise): boolean
+  + dispense(amountInPaise): Map<Integer, Integer>
+  - plan(amountInPaise): Map<Integer, Integer>
+  + inventorySummary(): String
+}
+
+class ReceiptPrinter {
+  + print(atm, record, notePlan, balanceAfter): String
+}
+
+class Transaction <<abstract>> {
+  # card: Card
+  # amountInPaise: long
+  # type: TransactionType
+  + execute(bank, dispenser): TransactionRecord
+  # validate(): void
+  # {abstract} runCore(bank, dispenser): Map<Integer, Integer>
+}
+
+class WithdrawCommand {
+  - dispenser: CashDispenser
+}
+class DepositCommand
+class BalanceInquiryCommand
+
+WithdrawCommand --up|> Transaction
+DepositCommand --up|> Transaction
+BalanceInquiryCommand --up|> Transaction
+
+class TransactionRecord <<immutable>> {
+  - cardLast4: String
+  - type: TransactionType
+  - amountInPaise: long
+  - result: AtmResult
+  - notePlan: Map<Integer, Integer>
+  - threadName: String
+  - timestamp: LocalDateTime
+  + auditLine(): String
+}
+
+class Atm {
+  - terminalId: String
+  - location: String
+  - bank: BankBackend
+  - dispenser: CashDispenser
+  - printer: ReceiptPrinter
+  - maxPinAttempts: int
+  - state: AtmState
+  - card: Card
+  - pinAttempts: int
+  - selectedTransaction: TransactionType
+  - enteredAmount: long
+  - auditTrail: List<TransactionRecord>
+  + insertCard(card): void
+  + enterPin(pin): void
+  + selectTransaction(type): void
+  + enterAmount(amount): void
+  + ejectCard(): void
+}
+
+class AtmException {
+  - result: AtmResult
+}
+
+' Relationships
+Atm o-- "1" AtmState : delegates every action
+Atm *-- "1" CashDispenser : one cash box
+Atm *-- "1" ReceiptPrinter : one printer
+Atm o-- "0..1" Card : session card
+Atm --> BankBackend : talks to the bank host
+Atm "1" o-- "many" TransactionRecord : audit trail
+InMemoryBankBackend "1" o-- "many" Card : issued cards
+InMemoryBankBackend "1" o-- "many" Account : accounts
+Card --> "1" Account : linked by id
+WithdrawCommand o-- "1" CashDispenser : checks before debit
+Transaction ..> TransactionRecord : produces (approved OR declined)
+Transaction ..> BankBackend : uses
+AtmException o-- AtmResult
+
+note right of AtmState
+  Every hook has a default that
+  rejects the action naming the
+  state. Concrete states override
+  ONLY their legal hooks - adding a
+  MaintenanceState is one new class,
+  not a 40-branch matrix edit.
+  States are stateless singletons;
+  session data (card, pin attempts,
+  selection, amount) lives on Atm.
+end note
+
+note bottom of Account
+  CONCURRENCY CRUX: tryDebit makes
+  read-check-write ONE critical
+  section under a per-account
+  ReentrantLock. Two ATMs racing on
+  one account: exactly one debit
+  wins, the loser declines cleanly.
+  (Lock lives on the shared
+  resource, NOT on the ATM.)
+end note
+
+note bottom of CashDispenser
+  Greedy plan-then-commit: plan()
+  only READS the inventory; the plan
+  is committed only if it composes
+  the full amount - a shortage can
+  never half-drain the machine.
+  Greedy has no backtracking:
+  INR 300 vs 2000-only = clean
+  DISPENSER_SHORTAGE decline BEFORE
+  the account is debited.
+end note
+
+note left of WithdrawCommand
+  Order of operations:
+  1. dispenser.canDispense (dry run)
+  2. bank.withdraw (atomic debit)
+  3. dispenser.dispense (commit)
+  Hardware feasibility FIRST, so a
+  failed dispense never owes the
+  customer an auto-reversal.
+end note
+
+note bottom of InMemoryBankBackend
+  Real ATMs speak ISO 8583 to the
+  bank's switch: 0200 request /
+  0210 response with response codes
+  (00 approved, 51 insufficient
+  funds, 55 bad PIN, 41 capture).
+  This class is the offline stand-in
+  behind the same interface.
+end note
+@enduml

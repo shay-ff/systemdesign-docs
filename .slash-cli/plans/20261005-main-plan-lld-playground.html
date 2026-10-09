@@ -1,0 +1,2507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LLD Practice Playground — Implementation Plan</title>
+<style>
+  body { max-width: 800px; margin: 2rem auto; padding: 0 1rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; color: #1a1a1a; }
+  h1 { font-size: 1.8rem; border-bottom: 3px solid #2563eb; padding-bottom: 0.3rem; }
+  h2 { font-size: 1.3rem; margin-top: 2.5rem; color: #1e40af; border-bottom: 1px solid #ddd; padding-bottom: 0.2rem; }
+  h3 { font-size: 1.05rem; margin-top: 1.8rem; background: #eef2ff; padding: 0.4rem 0.6rem; border-left: 4px solid #2563eb; }
+  h4 { font-size: 0.95rem; margin-top: 1.2rem; color: #374151; }
+  code { background: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.9em; }
+  pre { background: #111827; color: #e5e7eb; padding: 0.8rem 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+  pre code { background: none; color: inherit; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.9rem; }
+  th, td { border: 1px solid #d1d5db; padding: 0.4rem 0.6rem; text-align: left; }
+  th { background: #f3f4f6; }
+  .files { background: #fefce8; border: 1px solid #fde68a; padding: 0.6rem 0.9rem; border-radius: 6px; margin: 0.8rem 0; }
+  .interfaces { background: #ecfdf5; border: 1px solid #a7f3d0; padding: 0.6rem 0.9rem; border-radius: 6px; margin: 0.8rem 0; }
+  .step { margin: 0.9rem 0; }
+  .lede { font-style: italic; color: #4b5563; }
+  blockquote { border-left: 4px solid #f59e0b; background: #fffbeb; margin: 1rem 0; padding: 0.6rem 1rem; }
+</style>
+</head>
+<body>
+
+<h1>LLD Practice Playground — Implementation Plan</h1>
+<p class="lede">A new repo (<code>~/dev/lld-playground</code>): Next.js frontend + FastAPI API + a Docker-sandboxed executor, turning the six <code>systemdesign-docs</code> LLD problems into a run-your-code practice tool.</p>
+
+<blockquote>
+<strong>For agentic workers:</strong> REQUIRED SUB-SKILL: use <code>subagent-driven-development</code> (recommended) or <code>executing-plans</code> to implement this plan task-by-task. Each task's implementation goes through <code>test-driven-development</code>, which is mandatory for every task that contains logic. Steps use checkbox syntax for tracking.
+</blockquote>
+
+<p><strong>Goal:</strong> Build a working local playground where a user picks one of six LLD problems, writes a Python solution in a browser editor, runs it against a hidden test suite executed in a locked-down Docker container, and sees pass/fail — with the problem's design-discussion content unlocking only after a pass.</p>
+
+<p><strong>Architecture:</strong> Three services. A public <strong>API</strong> service (FastAPI) serves problem content and accepts submissions but never touches Docker directly. A separate <strong>executor</strong> service (FastAPI) is the only component that runs user code, via a per-submission, network-disabled, non-root, read-only-rootfs Docker container built from a pinned runner image with the six problems' hidden tests baked in. A <strong>frontend</strong> (Next.js) talks only to the API service.</p>
+
+<p><strong>Tech Stack:</strong> Next.js (App Router) + <code>@monaco-editor/react</code> for the frontend. FastAPI + <code>slowapi</code> (rate limiting) for both backend services. Docker CLI invoked via <code>subprocess</code> (argv lists, never <code>shell=True</code>) for sandboxing. <code>pytest</code> for all Python tests.</p>
+
+<h2>Global Constraints</h2>
+<ul>
+<li>Source of problem content: <code>~/dev/systemdesign-docs/01-ll-designs/&lt;problem&gt;/{README.md, explanation.md, solutions/python/*.py}</code> — copied, never fetched at runtime (per spec's content-sync decision).</li>
+<li>Submissions are Python only. Each problem's hidden tests enforce a specific class/method contract, listed per-task below — these are a deliberate, deterministic simplification of the full reference implementations (e.g. synchronous message delivery instead of threaded, an injectable clock for the rate limiter) so automated grading has no timing flakiness. The simplified contract is shown to the user alongside the problem statement as "Required signature," separate from the synced <code>README.md</code>/<code>explanation.md</code> text, which stays untouched.</li>
+<li>No shell-string interpolation anywhere user-submitted code or its path touches a subprocess call (<code>validation/untrusted-input</code> command-execution rule) — always pass argv lists.</li>
+<li>Executor container flags required on every run: <code>--network none</code>, <code>--read-only</code>, <code>--cap-drop ALL</code>, <code>--security-opt no-new-privileges</code>, non-root <code>--user</code>, explicit <code>--cpus</code>/<code>--memory</code>/<code>--pids-limit</code>, plus a hard <code>subprocess</code>-level timeout with a <code>docker kill</code> fallback (<code>containers/hardening</code>).
+<li>Runner base image is pinned to an exact tag (<code>python:3.12.7-slim</code>), never a floating tag like <code>latest</code> or <code>3.12-slim</code>.</li>
+<li>Frontend is pinned to Next.js 14.x (<code>create-next-app@14</code>). Next.js 15 made route <code>params</code> an async Promise — the plan's page components read <code>params</code> synchronously, which only holds on the 14.x App Router.</li>
+<li>No accounts, no server-side session. The <code>solved</code> flag the frontend sends to unlock <code>explanation.md</code> is a UX gate the user could bypass themselves — acceptable for a single-user tool, called out in the root README so it's never mistaken for a security control later.</li>
+<li>Scaffolding steps (creating a directory layout, running a project generator) have no meaningful "failing test" and use a setup-step + verification-step shape instead of red/green TDD. Every task containing logic (hidden tests, the executor, API routes, rate limiting) follows full TDD: failing test, run to confirm failure, minimal implementation, run to confirm pass, commit.</li>
+</ul>
+
+<hr>
+
+<h2>Phase A — Repo scaffold and content</h2>
+
+<h3>Task 1: Initialize the repo</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>~/dev/lld-playground/.gitignore</code></li>
+<li>Create: <code>~/dev/lld-playground/README.md</code></li>
+<li>Create: <code>~/dev/lld-playground/{frontend,backend,executor,scripts}/.gitkeep</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Create the repo and directory layout</strong></p>
+<pre><code>mkdir -p ~/dev/lld-playground/{frontend,backend,executor,scripts}
+cd ~/dev/lld-playground
+git init
+touch frontend/.gitkeep backend/.gitkeep executor/.gitkeep scripts/.gitkeep</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Write <code>.gitignore</code></strong></p>
+<pre><code># Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+out/
+
+# OS
+.DS_Store</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write root <code>README.md</code></strong></p>
+<pre><code># LLD Practice Playground
+
+Write Python solutions to classic LLD problems (LRU cache, rate limiter,
+bloom filter, URL shortener, consistent hashing, message queue) and run
+them against hidden tests in a sandboxed Docker container.
+
+## Services
+- `frontend/` — Next.js UI
+- `backend/` — public FastAPI API (problems, submissions)
+- `executor/` — the only service that runs user code, in a locked-down
+  per-submission Docker container (non-root, read-only rootfs, no network)
+
+## Security note
+There are no user accounts. The "solved" flag that unlocks a problem's
+design-discussion tab is set by the frontend and is a UX convenience, not
+an enforced security boundary — do not rely on it if accounts are ever
+added later.
+
+The `executor` service has the host's Docker socket mounted into it
+(`/var/run/docker.sock`) so it can launch per-submission sandbox
+containers. That grants `executor` root-equivalent access to the host —
+acceptable for a local, single-user, localhost-only tool, but this stack
+must never be exposed beyond localhost or to multiple users without
+replacing direct Docker-socket access with a properly isolated job runner
+(gVisor, Firecracker, or a managed sandboxed-execution API).
+
+## Content source
+Problem statements and reference solutions are copied from
+`systemdesign-docs/01-ll-designs/` via `scripts/sync_content.py`. Re-run
+that script by hand to pull upstream changes; nothing syncs automatically.</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Commit</strong></p>
+<pre><code>git add .gitignore README.md frontend backend executor scripts
+git commit -m "chore: initialize repo layout"</code></pre>
+</div>
+
+<h3>Task 2: Content-sync script</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>scripts/sync_content.py</code></li>
+<li>Create: <code>scripts/test_sync_content.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Produces:</strong> <code>backend/content/problems/&lt;problem_id&gt;/{README.md, explanation.md?, reference_python/*.py}</code>, consumed by Task 4's problem registry.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># scripts/test_sync_content.py
+import pathlib
+import shutil
+import tempfile
+
+from sync_content import PROBLEMS, sync
+
+
+def test_sync_copies_readme_and_python_for_every_problem():
+    with tempfile.TemporaryDirectory() as src_root, tempfile.TemporaryDirectory() as dest_root:
+        src = pathlib.Path(src_root)
+        dest = pathlib.Path(dest_root)
+        for problem in PROBLEMS:
+            problem_dir = src / problem / "solutions" / "python"
+            problem_dir.mkdir(parents=True)
+            (src / problem / "README.md").write_text(f"# {problem}")
+            (problem_dir / f"{problem}.py").write_text("class X: pass")
+        # consistent_hashing and url_shortener: one has explanation.md, one doesn't
+        (src / "lru_cache" / "explanation.md").write_text("why")
+
+        sync(source_root=src, dest_root=dest)
+
+        for problem in PROBLEMS:
+            assert (dest / problem / "README.md").read_text() == f"# {problem}"
+            assert (dest / problem / "reference_python").is_dir()
+        assert (dest / "lru_cache" / "explanation.md").read_text() == "why"
+        assert not (dest / "url_shortener" / "explanation.md").exists()</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/scripts
+pip install pytest
+pytest test_sync_content.py -v</code></pre>
+<p>Expected: FAIL — <code>ModuleNotFoundError: No module named 'sync_content'</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the implementation</strong></p>
+<pre><code># scripts/sync_content.py
+"""Copy problem content from systemdesign-docs into this repo.
+
+Run by hand: python scripts/sync_content.py
+Re-run any time the upstream problem content changes; nothing syncs
+automatically (see Global Constraints in the implementation plan).
+"""
+import pathlib
+import shutil
+
+PROBLEMS = [
+    "lru_cache",
+    "rate_limiter",
+    "bloom_filter",
+    "url_shortener",
+    "consistent_hashing",
+    "message_queue",
+]
+
+DEFAULT_SOURCE_ROOT = pathlib.Path("~/dev/systemdesign-docs/01-ll-designs").expanduser()
+DEFAULT_DEST_ROOT = pathlib.Path(__file__).resolve().parent.parent / "backend" / "content" / "problems"
+
+
+def sync(source_root: pathlib.Path = DEFAULT_SOURCE_ROOT, dest_root: pathlib.Path = DEFAULT_DEST_ROOT) -> None:
+    for problem in PROBLEMS:
+        src_dir = source_root / problem
+        dest_dir = dest_root / problem
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        shutil.copy2(src_dir / "README.md", dest_dir / "README.md")
+
+        explanation_src = src_dir / "explanation.md"
+        if explanation_src.exists():
+            shutil.copy2(explanation_src, dest_dir / "explanation.md")
+
+        python_src = src_dir / "solutions" / "python"
+        python_dest = dest_dir / "reference_python"
+        if python_dest.exists():
+            shutil.rmtree(python_dest)
+        shutil.copytree(python_src, python_dest)
+
+        print(f"synced {problem}")
+
+
+if __name__ == "__main__":
+    sync()</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes</strong></p>
+<pre><code>pytest test_sync_content.py -v</code></pre>
+<p>Expected: PASS.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 5: Run it for real against the actual source repo, then commit</strong></p>
+<pre><code>cd ~/dev/lld-playground
+python scripts/sync_content.py
+git add scripts/sync_content.py scripts/test_sync_content.py backend/content
+git commit -m "feat: add content-sync script and sync the six problems"</code></pre>
+</div>
+
+<hr>
+
+<h2>Phase B — Backend API service: problem content</h2>
+
+<h3>Task 3: Scaffold the API service</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>backend/pyproject.toml</code></li>
+<li>Create: <code>backend/app/__init__.py</code></li>
+<li>Create: <code>backend/app/main.py</code></li>
+<li>Create: <code>backend/tests/test_health.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write <code>pyproject.toml</code></strong></p>
+<pre><code>[project]
+name = "lld-playground-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
+    "slowapi>=0.1.9",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "pytest-asyncio>=0.24"]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Write the failing test</strong></p>
+<pre><code># backend/tests/test_health.py
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_health_check_returns_ok():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+pytest tests/test_health.py -v</code></pre>
+<p>Expected: FAIL — <code>ModuleNotFoundError: No module named 'app'</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Write minimal implementation</strong></p>
+<pre><code># backend/app/main.py
+from fastapi import FastAPI
+
+app = FastAPI(title="lld-playground-api")
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok"}</code></pre>
+<p><code>backend/app/__init__.py</code> is empty.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 5: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_health.py -v
+git add backend/pyproject.toml backend/app backend/tests
+git commit -m "feat: scaffold FastAPI api service with health check"</code></pre>
+</div>
+
+<h3>Task 4: Problem registry and signature metadata</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>backend/app/problems.py</code></li>
+<li>Test: <code>backend/tests/test_problems.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Consumes:</strong> <code>backend/content/problems/&lt;id&gt;/{README.md, explanation.md}</code> from Task 2.<br>
+<strong>Produces:</strong> <code>PROBLEMS: list[ProblemMeta]</code>, <code>get_problem_content(problem_id: str) -&gt; ProblemContent | None</code> — consumed by Tasks 5 and 6.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># backend/tests/test_problems.py
+from app.problems import PROBLEMS, get_problem_content
+
+
+def test_registry_lists_all_six_problems():
+    ids = {p.id for p in PROBLEMS}
+    assert ids == {
+        "lru_cache",
+        "rate_limiter",
+        "bloom_filter",
+        "url_shortener",
+        "consistent_hashing",
+        "message_queue",
+    }
+
+
+def test_get_problem_content_includes_statement_and_signature():
+    content = get_problem_content("lru_cache")
+    assert content is not None
+    assert "Least Recently Used" in content.statement
+    assert "class LRUCache" in content.required_signature
+
+
+def test_get_problem_content_omits_explanation_unless_requested():
+    content = get_problem_content("lru_cache")
+    assert content.explanation is None
+
+
+def test_get_problem_content_includes_explanation_when_requested():
+    content = get_problem_content("lru_cache", include_explanation=True)
+    assert content.explanation is not None
+    assert "Dual Data Structure" in content.explanation or "dual" in content.explanation.lower()
+
+
+def test_get_problem_content_returns_none_for_unknown_id():
+    assert get_problem_content("not-a-problem") is None</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>pytest tests/test_problems.py -v</code></pre>
+<p>Expected: FAIL — <code>ModuleNotFoundError: No module named 'app.problems'</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the implementation</strong></p>
+<pre><code># backend/app/problems.py
+import pathlib
+from dataclasses import dataclass
+
+CONTENT_ROOT = pathlib.Path(__file__).resolve().parent.parent / "content" / "problems"
+
+
+@dataclass(frozen=True)
+class ProblemMeta:
+    id: str
+    title: str
+    summary: str
+
+
+@dataclass(frozen=True)
+class ProblemContent:
+    id: str
+    statement: str
+    required_signature: str
+    explanation: str | None
+
+
+PROBLEMS: list[ProblemMeta] = [
+    ProblemMeta("lru_cache", "LRU Cache", "O(1) get/put cache with least-recently-used eviction."),
+    ProblemMeta("rate_limiter", "Rate Limiter", "Token-bucket request throttling."),
+    ProblemMeta("bloom_filter", "Bloom Filter", "Space-efficient probabilistic set membership."),
+    ProblemMeta("url_shortener", "URL Shortener", "Shorten and expand URLs with a generated code."),
+    ProblemMeta("consistent_hashing", "Consistent Hashing", "Distribute keys across nodes with minimal redistribution."),
+    ProblemMeta("message_queue", "Message Queue", "Topic-based publish/subscribe delivery."),
+]
+
+_PROBLEM_IDS = {p.id for p in PROBLEMS}
+
+REQUIRED_SIGNATURES: dict[str, str] = {
+    "lru_cache": (
+        "class LRUCache:\n"
+        "    def __init__(self, capacity: int): ...\n"
+        "    def get(self, key: int) -> int: ...  # -1 if missing\n"
+        "    def put(self, key: int, value: int) -> None: ..."
+    ),
+    "rate_limiter": (
+        "class TokenBucket:\n"
+        "    def __init__(self, capacity: int, refill_rate: float,\n"
+        "                 clock: Callable[[], float] = time.time): ...\n"
+        "    def allow_request(self, tokens_requested: int = 1) -> bool: ..."
+    ),
+    "bloom_filter": (
+        "class BloomFilter:\n"
+        "    def __init__(self, expected_elements: int, false_positive_rate: float = 0.01): ...\n"
+        "    def add(self, element: str) -> None: ...\n"
+        "    def contains(self, element: str) -> bool: ..."
+    ),
+    "url_shortener": (
+        "class URLShortener:\n"
+        "    def shorten(self, long_url: str) -> str: ...  # returns a short code\n"
+        "    def expand(self, short_code: str) -> str | None: ..."
+    ),
+    "consistent_hashing": (
+        "class ConsistentHash:\n"
+        "    def __init__(self, virtual_nodes: int = 3): ...\n"
+        "    def add_node(self, node_id: str) -> None: ...\n"
+        "    def remove_node(self, node_id: str) -> None: ...\n"
+        "    def get_node(self, key: str) -> str | None: ..."
+    ),
+    "message_queue": (
+        "class MessageQueue:\n"
+        "    def publish(self, topic: str, payload: str) -> str: ...  # returns message id\n"
+        "    def subscribe(self, topic: str, callback: Callable[[str], None]) -> None: ...\n"
+        "    # delivery is synchronous: publish() invokes every subscribed callback\n"
+        "    # for that topic before returning."
+    ),
+}
+
+
+def get_problem_content(problem_id: str, include_explanation: bool = False) -> ProblemContent | None:
+    if problem_id not in _PROBLEM_IDS:
+        return None
+
+    problem_dir = CONTENT_ROOT / problem_id
+    statement = (problem_dir / "README.md").read_text()
+
+    explanation = None
+    if include_explanation:
+        explanation_path = problem_dir / "explanation.md"
+        if explanation_path.exists():
+            explanation = explanation_path.read_text()
+
+    return ProblemContent(
+        id=problem_id,
+        statement=statement,
+        required_signature=REQUIRED_SIGNATURES[problem_id],
+        explanation=explanation,
+    )</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_problems.py -v
+git add backend/app/problems.py backend/tests/test_problems.py
+git commit -m "feat: add problem registry and required-signature metadata"</code></pre>
+</div>
+
+<h3>Task 5: <code>GET /problems</code> and <code>GET /problems/{id}</code></h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Modify: <code>backend/app/main.py</code></li>
+<li>Test: <code>backend/tests/test_problem_routes.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Consumes:</strong> <code>PROBLEMS</code>, <code>get_problem_content</code> from Task 4.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing tests</strong></p>
+<pre><code># backend/tests/test_problem_routes.py
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_list_problems_returns_all_six():
+    response = client.get("/problems")
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 6
+    assert {"id", "title", "summary"} <= body[0].keys()
+
+
+def test_get_problem_without_solved_flag_omits_explanation():
+    response = client.get("/problems/lru_cache")
+    assert response.status_code == 200
+    body = response.json()
+    assert "statement" in body
+    assert "required_signature" in body
+    assert "explanation" not in body
+
+
+def test_get_problem_with_solved_flag_includes_explanation():
+    response = client.get("/problems/lru_cache?solved=true")
+    assert response.status_code == 200
+    assert "explanation" in response.json()
+
+
+def test_get_unknown_problem_returns_404():
+    response = client.get("/problems/not-a-problem")
+    assert response.status_code == 404</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run tests to verify they fail</strong></p>
+<pre><code>pytest tests/test_problem_routes.py -v</code></pre>
+<p>Expected: FAIL — routes don't exist yet (404 for <code>/problems</code>).</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Implement the routes</strong></p>
+<pre><code># backend/app/main.py
+from fastapi import FastAPI, HTTPException
+
+from app.problems import PROBLEMS, get_problem_content
+
+app = FastAPI(title="lld-playground-api")
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/problems")
+def list_problems() -> list[dict]:
+    return [{"id": p.id, "title": p.title, "summary": p.summary} for p in PROBLEMS]
+
+
+@app.get("/problems/{problem_id}")
+def get_problem(problem_id: str, solved: bool = False) -> dict:
+    content = get_problem_content(problem_id, include_explanation=solved)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    result = {
+        "id": content.id,
+        "statement": content.statement,
+        "required_signature": content.required_signature,
+    }
+    if content.explanation is not None:
+        result["explanation"] = content.explanation
+    return result</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run tests to verify they pass, then commit</strong></p>
+<pre><code>pytest tests/test_problem_routes.py -v
+git add backend/app/main.py backend/tests/test_problem_routes.py
+git commit -m "feat: add GET /problems and GET /problems/{id} routes"</code></pre>
+</div>
+
+<hr>
+
+<h2>Phase C — Hidden test suites (one per problem)</h2>
+
+<p>Each file lives at <code>executor/hidden_tests/test_&lt;problem_id&gt;.py</code> and exports <code>TESTS: list[Callable]</code>, where each callable takes the submitted class and raises <code>AssertionError</code> on failure. This list is what Task 13's harness iterates. Tests are written and run directly against each problem's own <code>reference_python</code> implementation (synced in Task 2) as the "must pass" fixture — TDD here means: write the hidden test, confirm it fails against a deliberately broken stub, confirm it passes against the reference solution.</p>
+
+<h3>Task 6: Hidden tests — LRU Cache</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/hidden_tests/test_lru_cache.py</code></li>
+<li>Test: <code>executor/tests/test_hidden_lru_cache.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test (a broken stub must fail; this confirms the harness-facing contract before the real file exists)</strong></p>
+<pre><code># executor/tests/test_hidden_lru_cache.py
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+from hidden_tests.test_lru_cache import TESTS
+
+
+class BrokenLRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+
+    def get(self, key):
+        return -1  # always misses - should fail eviction/recency tests
+
+    def put(self, key, value):
+        pass  # no-op - should fail every test
+
+
+class ReferenceLRUCache:
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+        self.cache: dict[int, int] = {}
+        self.order: list[int] = []
+
+    def get(self, key: int) -> int:
+        if key not in self.cache:
+            return -1
+        self.order.remove(key)
+        self.order.append(key)
+        return self.cache[key]
+
+    def put(self, key: int, value: int) -> None:
+        if key in self.cache:
+            self.order.remove(key)
+        elif len(self.cache) >= self.capacity:
+            oldest = self.order.pop(0)
+            del self.cache[oldest]
+        self.cache[key] = value
+        self.order.append(key)
+
+
+def test_broken_stub_fails_at_least_one_hidden_test():
+    failures = []
+    for test_fn in TESTS:
+        try:
+            test_fn(BrokenLRUCache)
+        except AssertionError:
+            failures.append(test_fn.__name__)
+    assert failures, "expected the broken stub to fail at least one test"
+
+
+def test_reference_implementation_passes_every_hidden_test():
+    for test_fn in TESTS:
+        test_fn(ReferenceLRUCache)  # raises AssertionError on failure</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/executor
+python -m venv .venv && source .venv/bin/activate
+pip install pytest
+pytest tests/test_hidden_lru_cache.py -v</code></pre>
+<p>Expected: FAIL — <code>ModuleNotFoundError: No module named 'hidden_tests.test_lru_cache'</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the hidden test suite</strong></p>
+<pre><code># executor/hidden_tests/test_lru_cache.py
+def test_basic_put_get(cls):
+    cache = cls(2)
+    cache.put(1, 1)
+    cache.put(2, 2)
+    assert cache.get(1) == 1
+
+
+def test_missing_key_returns_minus_one(cls):
+    cache = cls(2)
+    assert cache.get(99) == -1
+
+
+def test_eviction_on_capacity(cls):
+    cache = cls(2)
+    cache.put(1, 1)
+    cache.put(2, 2)
+    cache.get(1)  # 1 is now most-recently-used
+    cache.put(3, 3)  # evicts 2, the least-recently-used
+    assert cache.get(2) == -1
+    assert cache.get(1) == 1
+    assert cache.get(3) == 3
+
+
+def test_put_existing_key_updates_value_and_recency(cls):
+    cache = cls(2)
+    cache.put(1, 1)
+    cache.put(2, 2)
+    cache.put(1, 10)  # update + mark 1 as most-recently-used
+    cache.put(3, 3)  # evicts 2, not 1
+    assert cache.get(1) == 10
+    assert cache.get(2) == -1
+    assert cache.get(3) == 3
+
+
+def test_capacity_one(cls):
+    cache = cls(1)
+    cache.put(1, 1)
+    cache.put(2, 2)  # evicts 1 immediately
+    assert cache.get(1) == -1
+    assert cache.get(2) == 2
+
+
+TESTS = [
+    test_basic_put_get,
+    test_missing_key_returns_minus_one,
+    test_eviction_on_capacity,
+    test_put_existing_key_updates_value_and_recency,
+    test_capacity_one,
+]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_hidden_lru_cache.py -v
+git add executor/hidden_tests/test_lru_cache.py executor/tests/test_hidden_lru_cache.py
+git commit -m "test: add hidden test suite for lru_cache"</code></pre>
+</div>
+
+<h3>Task 7: Hidden tests — Rate Limiter (Token Bucket)</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/hidden_tests/test_rate_limiter.py</code></li>
+<li>Test: <code>executor/tests/test_hidden_rate_limiter.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># executor/tests/test_hidden_rate_limiter.py
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+from hidden_tests.test_rate_limiter import TESTS
+
+
+class ReferenceTokenBucket:
+    def __init__(self, capacity, refill_rate, clock=None):
+        import time as _time
+        self.capacity = capacity
+        self.tokens = float(capacity)
+        self.refill_rate = refill_rate
+        self.clock = clock or _time.time
+        self.last_refill = self.clock()
+
+    def allow_request(self, tokens_requested: int = 1) -> bool:
+        now = self.clock()
+        elapsed = now - self.last_refill
+        self.last_refill = now
+        self.tokens = min(self.capacity, self.tokens + elapsed * self.refill_rate)
+        if self.tokens >= tokens_requested:
+            self.tokens -= tokens_requested
+            return True
+        return False
+
+
+class BrokenTokenBucket:
+    def __init__(self, capacity, refill_rate, clock=None):
+        pass
+
+    def allow_request(self, tokens_requested: int = 1) -> bool:
+        return True  # always allows - should fail the exhaustion test
+
+
+def test_broken_stub_fails_at_least_one_hidden_test():
+    failures = [t.__name__ for t in TESTS if _fails(t, BrokenTokenBucket)]
+    assert failures
+
+
+def test_reference_implementation_passes_every_hidden_test():
+    for test_fn in TESTS:
+        test_fn(ReferenceTokenBucket)
+
+
+def _fails(test_fn, cls) -> bool:
+    try:
+        test_fn(cls)
+        return False
+    except AssertionError:
+        return True</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>pytest tests/test_hidden_rate_limiter.py -v</code></pre>
+<p>Expected: FAIL — module not found.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the hidden test suite (uses an injectable fake clock — never real <code>time.sleep</code> — so grading is deterministic)</strong></p>
+<pre><code># executor/hidden_tests/test_rate_limiter.py
+class FakeClock:
+    def __init__(self, start: float = 0.0):
+        self.now = start
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def test_allows_requests_up_to_capacity(cls):
+    clock = FakeClock()
+    bucket = cls(capacity=3, refill_rate=1.0, clock=clock)
+    assert bucket.allow_request() is True
+    assert bucket.allow_request() is True
+    assert bucket.allow_request() is True
+
+
+def test_rejects_once_capacity_exhausted(cls):
+    clock = FakeClock()
+    bucket = cls(capacity=2, refill_rate=1.0, clock=clock)
+    bucket.allow_request()
+    bucket.allow_request()
+    assert bucket.allow_request() is False
+
+
+def test_refills_over_time(cls):
+    clock = FakeClock()
+    bucket = cls(capacity=2, refill_rate=1.0, clock=clock)
+    bucket.allow_request()
+    bucket.allow_request()
+    assert bucket.allow_request() is False
+    clock.advance(1.0)  # 1 token/sec * 1 sec = 1 token back
+    assert bucket.allow_request() is True
+    assert bucket.allow_request() is False
+
+
+def test_never_exceeds_capacity_after_long_idle(cls):
+    clock = FakeClock()
+    bucket = cls(capacity=2, refill_rate=1.0, clock=clock)
+    clock.advance(1000.0)  # huge idle gap
+    assert bucket.allow_request() is True
+    assert bucket.allow_request() is True
+    assert bucket.allow_request() is False
+
+
+TESTS = [
+    test_allows_requests_up_to_capacity,
+    test_rejects_once_capacity_exhausted,
+    test_refills_over_time,
+    test_never_exceeds_capacity_after_long_idle,
+]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_hidden_rate_limiter.py -v
+git add executor/hidden_tests/test_rate_limiter.py executor/tests/test_hidden_rate_limiter.py
+git commit -m "test: add hidden test suite for rate_limiter"</code></pre>
+</div>
+
+<h3>Task 8: Hidden tests — Bloom Filter</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/hidden_tests/test_bloom_filter.py</code></li>
+<li>Test: <code>executor/tests/test_hidden_bloom_filter.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># executor/tests/test_hidden_bloom_filter.py
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+from hidden_tests.test_bloom_filter import TESTS
+
+
+class ReferenceBloomFilter:
+    def __init__(self, expected_elements: int, false_positive_rate: float = 0.01):
+        import math
+        self.size = max(8, int(-(expected_elements * math.log(false_positive_rate)) / (math.log(2) ** 2)))
+        self.num_hashes = max(1, round((self.size / expected_elements) * math.log(2)))
+        self.bits = [False] * self.size
+
+    def _positions(self, element: str):
+        for seed in range(self.num_hashes):
+            yield hash((element, seed)) % self.size
+
+    def add(self, element: str) -> None:
+        for pos in self._positions(element):
+            self.bits[pos] = True
+
+    def contains(self, element: str) -> bool:
+        return all(self.bits[pos] for pos in self._positions(element))
+
+
+class BrokenBloomFilter:
+    def __init__(self, expected_elements, false_positive_rate=0.01):
+        pass
+
+    def add(self, element):
+        pass
+
+    def contains(self, element):
+        return False  # always "not present" - should fail the no-false-negatives test
+
+
+def test_broken_stub_fails_at_least_one_hidden_test():
+    failures = [t.__name__ for t in TESTS if _fails(t, BrokenBloomFilter)]
+    assert failures
+
+
+def test_reference_implementation_passes_every_hidden_test():
+    for test_fn in TESTS:
+        test_fn(ReferenceBloomFilter)
+
+
+def _fails(test_fn, cls) -> bool:
+    try:
+        test_fn(cls)
+        return False
+    except AssertionError:
+        return True</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>pytest tests/test_hidden_bloom_filter.py -v</code></pre>
+<p>Expected: FAIL — module not found.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the hidden test suite</strong></p>
+<pre><code># executor/hidden_tests/test_bloom_filter.py
+def test_added_elements_are_always_reported_present(cls):
+    bf = cls(expected_elements=100, false_positive_rate=0.01)
+    items = [f"item-{i}" for i in range(50)]
+    for item in items:
+        bf.add(item)
+    for item in items:
+        assert bf.contains(item) is True  # no false negatives, ever
+
+
+def test_empty_filter_reports_nothing_present(cls):
+    bf = cls(expected_elements=100, false_positive_rate=0.01)
+    assert bf.contains("never-added") is False
+
+
+def test_false_positive_rate_stays_within_a_generous_bound(cls):
+    bf = cls(expected_elements=1000, false_positive_rate=0.01)
+    added = [f"added-{i}" for i in range(1000)]
+    for item in added:
+        bf.add(item)
+    probes = [f"probe-{i}" for i in range(2000)]
+    false_positives = sum(1 for p in probes if bf.contains(p))
+    # generous bound (5x the configured rate) - this checks the mechanism
+    # works, not that the exact math is tuned.
+    assert false_positives / len(probes) < 0.05
+
+
+TESTS = [
+    test_added_elements_are_always_reported_present,
+    test_empty_filter_reports_nothing_present,
+    test_false_positive_rate_stays_within_a_generous_bound,
+]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_hidden_bloom_filter.py -v
+git add executor/hidden_tests/test_bloom_filter.py executor/tests/test_hidden_bloom_filter.py
+git commit -m "test: add hidden test suite for bloom_filter"</code></pre>
+</div>
+
+<h3>Task 9: Hidden tests — URL Shortener</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/hidden_tests/test_url_shortener.py</code></li>
+<li>Test: <code>executor/tests/test_hidden_url_shortener.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># executor/tests/test_hidden_url_shortener.py
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+from hidden_tests.test_url_shortener import TESTS
+
+
+class ReferenceURLShortener:
+    def __init__(self):
+        self._by_code: dict[str, str] = {}
+        self._counter = 0
+
+    def shorten(self, long_url: str) -> str:
+        self._counter += 1
+        code = f"c{self._counter}"
+        self._by_code[code] = long_url
+        return code
+
+    def expand(self, short_code: str) -> str | None:
+        return self._by_code.get(short_code)
+
+
+class BrokenURLShortener:
+    def shorten(self, long_url):
+        return "same-code-always"
+
+    def expand(self, short_code):
+        return None  # always missing - should fail the round-trip test
+
+
+def test_broken_stub_fails_at_least_one_hidden_test():
+    failures = [t.__name__ for t in TESTS if _fails(t, BrokenURLShortener)]
+    assert failures
+
+
+def test_reference_implementation_passes_every_hidden_test():
+    for test_fn in TESTS:
+        test_fn(ReferenceURLShortener)
+
+
+def _fails(test_fn, cls) -> bool:
+    try:
+        test_fn(cls)
+        return False
+    except AssertionError:
+        return True</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>pytest tests/test_hidden_url_shortener.py -v</code></pre>
+<p>Expected: FAIL — module not found.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the hidden test suite</strong></p>
+<pre><code># executor/hidden_tests/test_url_shortener.py
+def test_shorten_then_expand_round_trips(cls):
+    shortener = cls()
+    code = shortener.shorten("https://example.com/a/very/long/path")
+    assert shortener.expand(code) == "https://example.com/a/very/long/path"
+
+
+def test_different_urls_get_different_codes(cls):
+    shortener = cls()
+    code_a = shortener.shorten("https://a.example.com")
+    code_b = shortener.shorten("https://b.example.com")
+    assert code_a != code_b
+
+
+def test_expand_unknown_code_returns_none(cls):
+    shortener = cls()
+    assert shortener.expand("never-issued") is None
+
+
+def test_many_urls_each_round_trip_correctly(cls):
+    shortener = cls()
+    urls = [f"https://example.com/page-{i}" for i in range(20)]
+    codes = [shortener.shorten(url) for url in urls]
+    assert len(set(codes)) == len(urls)  # all codes unique
+    for code, url in zip(codes, urls):
+        assert shortener.expand(code) == url
+
+
+TESTS = [
+    test_shorten_then_expand_round_trips,
+    test_different_urls_get_different_codes,
+    test_expand_unknown_code_returns_none,
+    test_many_urls_each_round_trip_correctly,
+]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_hidden_url_shortener.py -v
+git add executor/hidden_tests/test_url_shortener.py executor/tests/test_hidden_url_shortener.py
+git commit -m "test: add hidden test suite for url_shortener"</code></pre>
+</div>
+
+<h3>Task 10: Hidden tests — Consistent Hashing</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/hidden_tests/test_consistent_hashing.py</code></li>
+<li>Test: <code>executor/tests/test_hidden_consistent_hashing.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># executor/tests/test_hidden_consistent_hashing.py
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+from hidden_tests.test_consistent_hashing import TESTS
+
+
+class ReferenceConsistentHash:
+    def __init__(self, virtual_nodes: int = 3):
+        import bisect
+        self.virtual_nodes = virtual_nodes
+        self.ring: dict[int, str] = {}
+        self.sorted_hashes: list[int] = []
+        self.nodes: set[str] = set()
+        self._bisect = bisect
+
+    def _hash(self, key: str) -> int:
+        return hash(key) & 0x7FFFFFFF
+
+    def add_node(self, node_id: str) -> None:
+        if node_id in self.nodes:
+            return
+        self.nodes.add(node_id)
+        for i in range(self.virtual_nodes):
+            h = self._hash(f"{node_id}:{i}")
+            self.ring[h] = node_id
+            self._bisect.insort(self.sorted_hashes, h)
+
+    def remove_node(self, node_id: str) -> None:
+        if node_id not in self.nodes:
+            return
+        self.nodes.remove(node_id)
+        for i in range(self.virtual_nodes):
+            h = self._hash(f"{node_id}:{i}")
+            self.ring.pop(h, None)
+            if h in self.sorted_hashes:
+                self.sorted_hashes.remove(h)
+
+    def get_node(self, key: str) -> str | None:
+        if not self.sorted_hashes:
+            return None
+        h = self._hash(key)
+        idx = self._bisect.bisect_right(self.sorted_hashes, h)
+        if idx == len(self.sorted_hashes):
+            idx = 0
+        return self.ring[self.sorted_hashes[idx]]
+
+
+class BrokenConsistentHash:
+    def __init__(self, virtual_nodes=3):
+        pass
+
+    def add_node(self, node_id):
+        pass
+
+    def remove_node(self, node_id):
+        pass
+
+    def get_node(self, key):
+        return None  # no nodes ever found - should fail every lookup test
+
+
+def test_broken_stub_fails_at_least_one_hidden_test():
+    failures = [t.__name__ for t in TESTS if _fails(t, BrokenConsistentHash)]
+    assert failures
+
+
+def test_reference_implementation_passes_every_hidden_test():
+    for test_fn in TESTS:
+        test_fn(ReferenceConsistentHash)
+
+
+def _fails(test_fn, cls) -> bool:
+    try:
+        test_fn(cls)
+        return False
+    except AssertionError:
+        return True</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>pytest tests/test_hidden_consistent_hashing.py -v</code></pre>
+<p>Expected: FAIL — module not found.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the hidden test suite</strong></p>
+<pre><code># executor/hidden_tests/test_consistent_hashing.py
+def test_no_nodes_returns_none(cls):
+    ring = cls(virtual_nodes=3)
+    assert ring.get_node("any-key") is None
+
+
+def test_single_node_handles_every_key(cls):
+    ring = cls(virtual_nodes=3)
+    ring.add_node("server1")
+    for i in range(20):
+        assert ring.get_node(f"key-{i}") == "server1"
+
+
+def test_same_key_always_maps_to_same_node(cls):
+    ring = cls(virtual_nodes=3)
+    for node in ["server1", "server2", "server3"]:
+        ring.add_node(node)
+    first = ring.get_node("stable-key")
+    for _ in range(10):
+        assert ring.get_node("stable-key") == first
+
+
+def test_keys_distribute_across_multiple_nodes(cls):
+    ring = cls(virtual_nodes=10)
+    for node in ["server1", "server2", "server3"]:
+        ring.add_node(node)
+    assigned = {ring.get_node(f"key-{i}") for i in range(200)}
+    assert len(assigned) > 1  # not all keys on one node
+
+
+def test_removing_a_node_reassigns_only_its_keys(cls):
+    ring = cls(virtual_nodes=10)
+    for node in ["server1", "server2", "server3"]:
+        ring.add_node(node)
+    keys = [f"key-{i}" for i in range(200)]
+    before = {key: ring.get_node(key) for key in keys}
+
+    ring.remove_node("server2")
+
+    for key in keys:
+        after = ring.get_node(key)
+        assert after != "server2"
+        if before[key] != "server2":
+            assert after == before[key]  # unaffected keys stay put
+
+
+TESTS = [
+    test_no_nodes_returns_none,
+    test_single_node_handles_every_key,
+    test_same_key_always_maps_to_same_node,
+    test_keys_distribute_across_multiple_nodes,
+    test_removing_a_node_reassigns_only_its_keys,
+]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_hidden_consistent_hashing.py -v
+git add executor/hidden_tests/test_consistent_hashing.py executor/tests/test_hidden_consistent_hashing.py
+git commit -m "test: add hidden test suite for consistent_hashing"</code></pre>
+</div>
+
+<h3>Task 11: Hidden tests — Message Queue</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/hidden_tests/test_message_queue.py</code></li>
+<li>Test: <code>executor/tests/test_hidden_message_queue.py</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># executor/tests/test_hidden_message_queue.py
+import sys
+import pathlib
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+
+from hidden_tests.test_message_queue import TESTS
+
+
+class ReferenceMessageQueue:
+    def __init__(self):
+        self._subscribers: dict[str, list] = {}
+        self._counter = 0
+
+    def publish(self, topic: str, payload: str) -> str:
+        self._counter += 1
+        message_id = f"m{self._counter}"
+        for callback in self._subscribers.get(topic, []):
+            callback(payload)
+        return message_id
+
+    def subscribe(self, topic: str, callback) -> None:
+        self._subscribers.setdefault(topic, []).append(callback)
+
+
+class BrokenMessageQueue:
+    def publish(self, topic, payload):
+        return "m1"  # never actually delivers - should fail delivery tests
+
+    def subscribe(self, topic, callback):
+        pass
+
+
+def test_broken_stub_fails_at_least_one_hidden_test():
+    failures = [t.__name__ for t in TESTS if _fails(t, BrokenMessageQueue)]
+    assert failures
+
+
+def test_reference_implementation_passes_every_hidden_test():
+    for test_fn in TESTS:
+        test_fn(ReferenceMessageQueue)
+
+
+def _fails(test_fn, cls) -> bool:
+    try:
+        test_fn(cls)
+        return False
+    except AssertionError:
+        return True</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>pytest tests/test_hidden_message_queue.py -v</code></pre>
+<p>Expected: FAIL — module not found.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the hidden test suite (delivery is synchronous per the required signature, so no sleeps/threads are needed for deterministic grading)</strong></p>
+<pre><code># executor/hidden_tests/test_message_queue.py
+def test_single_subscriber_receives_published_message(cls):
+    mq = cls()
+    received = []
+    mq.subscribe("orders", received.append)
+    mq.publish("orders", "order-1")
+    assert received == ["order-1"]
+
+
+def test_multiple_subscribers_on_same_topic_all_receive(cls):
+    mq = cls()
+    received_a, received_b = [], []
+    mq.subscribe("orders", received_a.append)
+    mq.subscribe("orders", received_b.append)
+    mq.publish("orders", "order-1")
+    assert received_a == ["order-1"]
+    assert received_b == ["order-1"]
+
+
+def test_subscriber_on_other_topic_does_not_receive(cls):
+    mq = cls()
+    received = []
+    mq.subscribe("notifications", received.append)
+    mq.publish("orders", "order-1")
+    assert received == []
+
+
+def test_messages_within_a_topic_arrive_in_fifo_order(cls):
+    mq = cls()
+    received = []
+    mq.subscribe("orders", received.append)
+    mq.publish("orders", "order-1")
+    mq.publish("orders", "order-2")
+    mq.publish("orders", "order-3")
+    assert received == ["order-1", "order-2", "order-3"]
+
+
+def test_publish_returns_a_message_id(cls):
+    mq = cls()
+    message_id = mq.publish("orders", "order-1")
+    assert isinstance(message_id, str)
+    assert message_id
+
+
+TESTS = [
+    test_single_subscriber_receives_published_message,
+    test_multiple_subscribers_on_same_topic_all_receive,
+    test_subscriber_on_other_topic_does_not_receive,
+    test_messages_within_a_topic_arrive_in_fifo_order,
+    test_publish_returns_a_message_id,
+]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_hidden_message_queue.py -v
+git add executor/hidden_tests/test_message_queue.py executor/tests/test_hidden_message_queue.py
+git commit -m "test: add hidden test suite for message_queue"</code></pre>
+</div>
+
+<hr>
+
+<h2>Phase D — Executor: sandboxed Docker runner</h2>
+
+<h3>Task 12: In-container harness</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/runner_image/harness.py</code></li>
+<li>Test: <code>executor/tests/test_harness.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Consumes:</strong> <code>TESTS</code> lists from Tasks 6–11 (imported as <code>hidden_tests.test_&lt;problem_id&gt;</code>).<br>
+<strong>Produces:</strong> a JSON line on stdout: <code>{"passed": bool, "results": [{"name": str, "passed": bool, "message"?: str}]} </code> or <code>{"passed": false, "error": str, "message": str}</code> — consumed by Task 15's <code>docker_runner.py</code>.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># executor/tests/test_harness.py
+import json
+import pathlib
+import subprocess
+import sys
+import tempfile
+
+HARNESS = pathlib.Path(__file__).resolve().parent.parent / "runner_image" / "harness.py"
+EXECUTOR_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+def run_harness(problem_id: str, code: str) -> dict:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        submission_path = pathlib.Path(tmp_dir) / "submission.py"
+        submission_path.write_text(code)
+        result = subprocess.run(
+            [sys.executable, str(HARNESS), str(submission_path)],
+            env={"PROBLEM_ID": problem_id, "PYTHONPATH": str(EXECUTOR_ROOT)},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def test_passing_submission_reports_passed_true():
+    code = """
+class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.cache = {}
+        self.order = []
+
+    def get(self, key):
+        if key not in self.cache:
+            return -1
+        self.order.remove(key)
+        self.order.append(key)
+        return self.cache[key]
+
+    def put(self, key, value):
+        if key in self.cache:
+            self.order.remove(key)
+        elif len(self.cache) >= self.capacity:
+            oldest = self.order.pop(0)
+            del self.cache[oldest]
+        self.cache[key] = value
+        self.order.append(key)
+"""
+    result = run_harness("lru_cache", code)
+    assert result["passed"] is True
+    assert all(r["passed"] for r in result["results"])
+
+
+def test_failing_submission_reports_passed_false_with_per_test_detail():
+    code = "class LRUCache:\n    def __init__(self, capacity): pass\n    def get(self, key): return -1\n    def put(self, key, value): pass\n"
+    result = run_harness("lru_cache", code)
+    assert result["passed"] is False
+    assert any(not r["passed"] for r in result["results"])
+
+
+def test_missing_class_reports_a_clear_error():
+    result = run_harness("lru_cache", "x = 1\n")
+    assert result["passed"] is False
+    assert result["error"] == "missing_class"
+
+
+def test_syntax_error_reports_import_error():
+    result = run_harness("lru_cache", "def broken(:\n")
+    assert result["passed"] is False
+    assert result["error"] == "import_error"</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/executor
+pytest tests/test_harness.py -v</code></pre>
+<p>Expected: FAIL — <code>harness.py</code> doesn't exist.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the harness</strong></p>
+<pre><code># executor/runner_image/harness.py
+"""Runs inside the sandboxed container. Imports the submitted module from
+the path given as argv[1], runs the hidden tests for PROBLEM_ID against
+it, and prints one JSON line to stdout. Never touches the network or
+anything outside the path it's given.
+"""
+import importlib
+import importlib.util
+import json
+import os
+import sys
+
+PROBLEM_CLASS = {
+    "lru_cache": "LRUCache",
+    "rate_limiter": "TokenBucket",
+    "bloom_filter": "BloomFilter",
+    "url_shortener": "URLShortener",
+    "consistent_hashing": "ConsistentHash",
+    "message_queue": "MessageQueue",
+}
+
+
+def load_submission(path: str):
+    spec = importlib.util.spec_from_file_location("submission", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def main() -> None:
+    problem_id = os.environ["PROBLEM_ID"]
+    submission_path = sys.argv[1]
+    class_name = PROBLEM_CLASS[problem_id]
+
+    try:
+        submission = load_submission(submission_path)
+    except Exception as exc:  # noqa: BLE001 - deliberately broad: any
+        # error in untrusted code becomes a structured result, not a crash.
+        print(json.dumps({"passed": False, "error": "import_error", "message": str(exc)}))
+        return
+
+    if not hasattr(submission, class_name):
+        print(json.dumps({
+            "passed": False,
+            "error": "missing_class",
+            "message": f"Expected class {class_name} not found in submission",
+        }))
+        return
+
+    submitted_cls = getattr(submission, class_name)
+    test_module = importlib.import_module(f"hidden_tests.test_{problem_id}")
+
+    results = []
+    for test_fn in test_module.TESTS:
+        name = test_fn.__name__
+        try:
+            test_fn(submitted_cls)
+            results.append({"name": name, "passed": True})
+        except AssertionError as exc:
+            results.append({"name": name, "passed": False, "message": str(exc)})
+        except Exception as exc:  # noqa: BLE001 - same reasoning as above
+            results.append({"name": name, "passed": False, "message": f"{type(exc).__name__}: {exc}"})
+
+    print(json.dumps({"passed": all(r["passed"] for r in results), "results": results}))
+
+
+if __name__ == "__main__":
+    main()</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_harness.py -v
+git add executor/runner_image/harness.py executor/tests/test_harness.py
+git commit -m "feat: add in-container test harness"</code></pre>
+</div>
+
+<h3>Task 13: Runner image</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/runner_image/Dockerfile</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the Dockerfile (pinned base image, non-root user, hidden tests baked in — never sent over the API)</strong></p>
+<pre><code># executor/runner_image/Dockerfile
+FROM python:3.12.7-slim
+
+RUN useradd --create-home --uid 1000 runner
+
+WORKDIR /harness
+COPY runner_image/harness.py /harness/harness.py
+COPY hidden_tests /harness/hidden_tests
+
+RUN chown -R runner:runner /harness
+USER runner
+ENV PYTHONPATH=/harness
+
+ENTRYPOINT ["python", "/harness/harness.py"]</code></pre>
+<p>Note: both <code>COPY</code> sources are relative to the build context, not to the Dockerfile's own location — the context must be <code>executor/</code> (not <code>executor/runner_image/</code>), which is why the build command below passes <code>.</code> from inside <code>executor/</code>. Docker cannot <code>COPY</code> from outside the build context, so a relative <code>../hidden_tests</code> would fail.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Build and smoke-test manually</strong></p>
+<pre><code>cd ~/dev/lld-playground/executor
+docker build -f runner_image/Dockerfile -t lld-runner:latest .
+echo 'class LRUCache:
+    def __init__(self, capacity): self.c={}
+    def get(self, key): return self.c.get(key, -1)
+    def put(self, key, value): self.c[key]=value
+' > /tmp/submission.py
+docker run --rm --network none --read-only --tmpfs /tmp:rw,size=10m \
+  --user runner -e PROBLEM_ID=lru_cache \
+  -v /tmp/submission.py:/sandbox/submission.py:ro \
+  lld-runner:latest /sandbox/submission.py</code></pre>
+<p>Expected: a JSON line with <code>"passed": false</code> (this stub doesn't implement real eviction, which the hidden tests catch) — confirms the image runs and the harness executes.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Commit</strong></p>
+<pre><code>git add executor/runner_image/Dockerfile
+git commit -m "feat: add sandboxed runner image"</code></pre>
+</div>
+
+<h3>Task 14: Docker-per-submission runner (<code>docker_runner.py</code>)</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/app/__init__.py</code> (empty — makes <code>executor/app</code> a regular package, matching <code>backend/app/__init__.py</code> from Task 3)</li>
+<li>Create: <code>executor/app/docker_runner.py</code></li>
+<li>Test: <code>executor/tests/test_docker_runner.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Produces:</strong> <code>run_submission(problem_id: str, code: str) -&gt; dict</code> — consumed by Task 15's <code>/run</code> endpoint.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test (mocks <code>subprocess.run</code> — no real Docker needed for this unit test; Task 16 covers the real-Docker integration path)</strong></p>
+<pre><code># executor/tests/test_docker_runner.py
+import json
+import subprocess
+from unittest.mock import patch
+
+from app.docker_runner import run_submission
+
+
+def test_run_submission_builds_argv_list_never_a_shell_string():
+    fake_result = subprocess.CompletedProcess(args=[], returncode=0, stdout=json.dumps({"passed": True, "results": []}), stderr="")
+    with patch("app.docker_runner.subprocess.run", return_value=fake_result) as mock_run:
+        run_submission("lru_cache", "class LRUCache: pass")
+        call_args = mock_run.call_args
+        cmd = call_args.args[0]
+        assert isinstance(cmd, list)  # argv list, never a shell string
+        assert call_args.kwargs.get("shell", False) is False
+        assert "--network" in cmd and "none" in cmd
+        assert "--read-only" in cmd
+        assert "--cap-drop" in cmd and "ALL" in cmd
+        assert "--user" in cmd and "runner" in cmd
+
+
+def test_run_submission_parses_harness_json_output():
+    fake_result = subprocess.CompletedProcess(
+        args=[], returncode=0,
+        stdout=json.dumps({"passed": True, "results": [{"name": "t1", "passed": True}]}),
+        stderr="",
+    )
+    with patch("app.docker_runner.subprocess.run", return_value=fake_result):
+        result = run_submission("lru_cache", "class LRUCache: pass")
+    assert result == {"passed": True, "results": [{"name": "t1", "passed": True}]}
+
+
+def test_timeout_is_reported_as_structured_error():
+    with patch("app.docker_runner.subprocess.run") as mock_run:
+        def side_effect(cmd, **kwargs):
+            if cmd[0] == "docker" and cmd[1] == "kill":
+                return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+            raise subprocess.TimeoutExpired(cmd=cmd, timeout=10)
+        mock_run.side_effect = side_effect
+        result = run_submission("lru_cache", "while True: pass")
+    assert result == {"passed": False, "error": "timeout", "message": "Execution exceeded 10s"}
+
+
+def test_malformed_harness_output_reports_harness_error():
+    fake_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="not json", stderr="")
+    with patch("app.docker_runner.subprocess.run", return_value=fake_result):
+        result = run_submission("lru_cache", "class LRUCache: pass")
+    assert result["passed"] is False
+    assert result["error"] == "harness_error"</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/executor
+pytest tests/test_docker_runner.py -v</code></pre>
+<p>Expected: FAIL — <code>ModuleNotFoundError: No module named 'app.docker_runner'</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the implementation</strong></p>
+<pre><code># executor/app/docker_runner.py
+"""Runs one user submission in a locked-down, per-submission Docker
+container. Never builds a shell string from user input - the submission
+is written to a file and Docker is invoked with an argv list.
+"""
+import json
+import os
+import subprocess
+import tempfile
+import uuid
+
+IMAGE = "lld-runner:latest"
+TIMEOUT_SECONDS = 10
+
+
+def run_submission(problem_id: str, code: str) -> dict:
+    run_id = uuid.uuid4().hex[:12]
+    container_name = f"lld-run-{run_id}"
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        submission_path = os.path.join(tmp_dir, "submission.py")
+        with open(submission_path, "w") as f:
+            f.write(code)
+        os.chmod(submission_path, 0o444)
+
+        cmd = [
+            "docker", "run", "--rm",
+            "--name", container_name,
+            "--network", "none",
+            "--read-only",
+            "--tmpfs", "/tmp:rw,size=10m,mode=1777",
+            "--cpus", "0.5",
+            "--memory", "128m",
+            "--pids-limit", "64",
+            "--cap-drop", "ALL",
+            "--security-opt", "no-new-privileges",
+            "--user", "runner",
+            "-v", f"{submission_path}:/sandbox/submission.py:ro",
+            "-e", f"PROBLEM_ID={problem_id}",
+            IMAGE,
+            "/sandbox/submission.py",
+        ]
+
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            subprocess.run(["docker", "kill", container_name], capture_output=True, text=True)
+            return {"passed": False, "error": "timeout", "message": f"Execution exceeded {TIMEOUT_SECONDS}s"}
+
+        return _parse_harness_output(proc)
+
+
+def _parse_harness_output(proc: subprocess.CompletedProcess) -> dict:
+    output = proc.stdout.strip()
+    if not output:
+        return {"passed": False, "error": "runtime_error", "message": proc.stderr[-2000:]}
+    try:
+        last_line = output.splitlines()[-1]
+        return json.loads(last_line)
+    except (json.JSONDecodeError, IndexError):
+        return {
+            "passed": False,
+            "error": "harness_error",
+            "message": (output + proc.stderr)[-2000:],
+        }</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_docker_runner.py -v
+git add executor/app/__init__.py executor/app/docker_runner.py executor/tests/test_docker_runner.py
+git commit -m "feat: add sandboxed docker-per-submission runner"</code></pre>
+</div>
+
+<h3>Task 15: Executor HTTP service</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/app/main.py</code></li>
+<li>Create: <code>executor/pyproject.toml</code></li>
+<li>Test: <code>executor/tests/test_run_endpoint.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Consumes:</strong> <code>run_submission</code> from Task 14.<br>
+<strong>Produces:</strong> <code>POST /run</code> — consumed by Task 17's <code>executor_client.py</code> in the API service.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write <code>pyproject.toml</code></strong></p>
+<pre><code># executor/pyproject.toml
+[project]
+name = "lld-playground-executor"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115", "uvicorn>=0.32"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "httpx>=0.27"]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Write the failing test</strong></p>
+<pre><code># executor/tests/test_run_endpoint.py
+from unittest.mock import patch
+
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+def test_run_endpoint_returns_result_from_docker_runner():
+    with patch("app.main.run_submission", return_value={"passed": True, "results": []}) as mock_run:
+        response = client.post("/run", json={"problem_id": "lru_cache", "code": "class LRUCache: pass"})
+    assert response.status_code == 200
+    assert response.json() == {"passed": True, "results": []}
+    mock_run.assert_called_once_with("lru_cache", "class LRUCache: pass")
+
+
+def test_run_endpoint_rejects_unknown_problem_id():
+    response = client.post("/run", json={"problem_id": "not-a-problem", "code": "x = 1"})
+    assert response.status_code == 404</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/executor
+pip install -e ".[dev]"
+pytest tests/test_run_endpoint.py -v</code></pre>
+<p>Expected: FAIL — <code>ModuleNotFoundError: No module named 'app.main'</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Write the implementation</strong></p>
+<pre><code># executor/app/main.py
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+from app.docker_runner import run_submission
+
+app = FastAPI(title="lld-playground-executor")
+
+KNOWN_PROBLEM_IDS = {
+    "lru_cache",
+    "rate_limiter",
+    "bloom_filter",
+    "url_shortener",
+    "consistent_hashing",
+    "message_queue",
+}
+
+
+class RunRequest(BaseModel):
+    problem_id: str
+    code: str
+
+
+@app.post("/run")
+def run(request: RunRequest) -> dict:
+    if request.problem_id not in KNOWN_PROBLEM_IDS:
+        raise HTTPException(status_code=404, detail="Unknown problem_id")
+    return run_submission(request.problem_id, request.code)</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 5: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_run_endpoint.py -v
+git add executor/app/main.py executor/pyproject.toml executor/tests/test_run_endpoint.py
+git commit -m "feat: add executor /run endpoint"</code></pre>
+</div>
+
+<h3>Task 16: Sandbox isolation integration tests</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>executor/tests/test_sandbox_isolation.py</code></li>
+</ul>
+</div>
+<p>These require a real Docker daemon and the <code>lld-runner:latest</code> image built (Task 13) — run separately from the rest of the unit suite, which mocks <code>subprocess.run</code>. Mark them so CI/local runs can skip them when Docker isn't available.</p>
+
+<div class="step">
+<p><strong>Step 1: Write the tests directly (no red/green cycle here — these assert real sandbox properties against the real image, which either already holds or doesn't)</strong></p>
+<pre><code># executor/tests/test_sandbox_isolation.py
+import shutil
+
+import pytest
+
+from app.docker_runner import run_submission
+
+pytestmark = pytest.mark.skipif(shutil.which("docker") is None, reason="docker not available")
+
+
+def test_submission_cannot_reach_the_network():
+    code = """
+class LRUCache:
+    def __init__(self, capacity):
+        import socket
+        try:
+            socket.create_connection(("8.8.8.8", 53), timeout=2)
+            self.reached_network = True
+        except OSError:
+            self.reached_network = False
+    def get(self, key): return -1
+    def put(self, key, value): pass
+"""
+    # The hidden tests will fail regardless (this stub doesn't implement
+    # the cache), but a crash from the socket call would surface as an
+    # import_error - absence of that error is what confirms the network
+    # attempt failed cleanly rather than hanging or succeeding.
+    result = run_submission("lru_cache", code)
+    assert result.get("error") != "timeout"
+
+
+def test_submission_cannot_write_outside_tmp():
+    code = """
+class LRUCache:
+    def __init__(self, capacity):
+        try:
+            open("/etc/escaped.txt", "w").write("pwned")
+            self.escaped = True
+        except OSError:
+            self.escaped = False
+    def get(self, key): return -1
+    def put(self, key, value): pass
+"""
+    result = run_submission("lru_cache", code)
+    assert result.get("error") != "timeout"
+
+
+def test_infinite_loop_is_killed_by_timeout():
+    code = "class LRUCache:\n    def __init__(self, capacity):\n        while True: pass\n"
+    result = run_submission("lru_cache", code)
+    assert result == {"passed": False, "error": "timeout", "message": "Execution exceeded 10s"}</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Build the image if needed and run</strong></p>
+<pre><code>cd ~/dev/lld-playground/executor
+docker build -f runner_image/Dockerfile -t lld-runner:latest .
+pytest tests/test_sandbox_isolation.py -v</code></pre>
+<p>Expected: PASS. If the network test fails (connection succeeds), re-check the <code>--network none</code> flag in <code>docker_runner.py</code> before proceeding — this is the one test in the whole plan that directly verifies the security boundary, not just application logic.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Commit</strong></p>
+<pre><code>git add executor/tests/test_sandbox_isolation.py
+git commit -m "test: add sandbox isolation integration tests"</code></pre>
+</div>
+
+<hr>
+
+<h2>Phase E — Wire the API service to the executor</h2>
+
+<h3>Task 17: Executor client + <code>POST /problems/{id}/submit</code> with rate limiting</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>backend/app/executor_client.py</code></li>
+<li>Modify: <code>backend/app/main.py</code></li>
+<li>Modify: <code>backend/pyproject.toml</code> (add <code>httpx</code>, already listed in Task 3)</li>
+<li>Test: <code>backend/tests/test_submit_route.py</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Consumes:</strong> executor's <code>POST /run</code> from Task 15.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the failing test</strong></p>
+<pre><code># backend/tests/test_submit_route.py
+from unittest.mock import patch
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    # slowapi's in-memory limiter storage persists across requests within
+    # the same process. Without resetting it, earlier tests in this module
+    # consume from the same 10/minute budget (TestClient always presents as
+    # the same "testclient" address), making the dedicated rate-limit test
+    # below order-dependent and flaky.
+    app.state.limiter.reset()
+    yield
+
+
+def test_submit_calls_executor_and_returns_its_result():
+    with patch("app.main.call_executor", return_value={"passed": True, "results": []}) as mock_call:
+        response = client.post("/problems/lru_cache/submit", json={"code": "class LRUCache: pass"})
+    assert response.status_code == 200
+    assert response.json() == {"passed": True, "results": []}
+    mock_call.assert_called_once_with("lru_cache", "class LRUCache: pass")
+
+
+def test_submit_rejects_unknown_problem_id():
+    response = client.post("/problems/not-a-problem/submit", json={"code": "x = 1"})
+    assert response.status_code == 404
+
+
+def test_submit_is_rate_limited_after_ten_requests_per_minute():
+    with patch("app.main.call_executor", return_value={"passed": True, "results": []}):
+        for _ in range(10):
+            response = client.post("/problems/lru_cache/submit", json={"code": "class LRUCache: pass"})
+            assert response.status_code == 200
+        limited = client.post("/problems/lru_cache/submit", json={"code": "class LRUCache: pass"})
+    assert limited.status_code == 429</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Run test to verify it fails</strong></p>
+<pre><code>cd ~/dev/lld-playground/backend
+pytest tests/test_submit_route.py -v</code></pre>
+<p>Expected: FAIL — <code>/problems/lru_cache/submit</code> route doesn't exist (404 on a request that should be 200).</p>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write <code>executor_client.py</code></strong></p>
+<pre><code># backend/app/executor_client.py
+import httpx
+
+EXECUTOR_URL = "http://localhost:8001"
+
+
+def call_executor(problem_id: str, code: str) -> dict:
+    response = httpx.post(
+        f"{EXECUTOR_URL}/run",
+        json={"problem_id": problem_id, "code": code},
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    return response.json()</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Wire the route and rate limiting into <code>main.py</code></strong></p>
+<pre><code># backend/app/main.py
+from fastapi import FastAPI, HTTPException, Request
+from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
+from app.executor_client import call_executor
+from app.problems import PROBLEMS, get_problem_content
+
+app = FastAPI(title="lld-playground-api")
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+_PROBLEM_IDS = {p.id for p in PROBLEMS}
+
+
+@app.get("/health")
+def health() -> dict:
+    return {"status": "ok"}
+
+
+@app.get("/problems")
+def list_problems() -> list[dict]:
+    return [{"id": p.id, "title": p.title, "summary": p.summary} for p in PROBLEMS]
+
+
+@app.get("/problems/{problem_id}")
+def get_problem(problem_id: str, solved: bool = False) -> dict:
+    content = get_problem_content(problem_id, include_explanation=solved)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Problem not found")
+
+    result = {
+        "id": content.id,
+        "statement": content.statement,
+        "required_signature": content.required_signature,
+    }
+    if content.explanation is not None:
+        result["explanation"] = content.explanation
+    return result
+
+
+class SubmitRequest(BaseModel):
+    code: str
+
+
+@app.post("/problems/{problem_id}/submit")
+@limiter.limit("10/minute")
+def submit_solution(problem_id: str, body: SubmitRequest, request: Request) -> dict:
+    if problem_id not in _PROBLEM_IDS:
+        raise HTTPException(status_code=404, detail="Problem not found")
+    return call_executor(problem_id, body.code)</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 5: Run test to verify it passes, then commit</strong></p>
+<pre><code>pytest tests/test_submit_route.py -v
+git add backend/app/executor_client.py backend/app/main.py backend/tests/test_submit_route.py
+git commit -m "feat: wire /problems/{id}/submit to the executor, with rate limiting"</code></pre>
+</div>
+
+<hr>
+
+<h2>Phase F — Frontend</h2>
+
+<h3>Task 18: Scaffold Next.js app and problem list page</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>frontend/</code> (via <code>create-next-app</code>)</li>
+<li>Create: <code>frontend/app/page.tsx</code></li>
+<li>Create: <code>frontend/lib/api.ts</code></li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Scaffold with the official generator</strong></p>
+<pre><code>cd ~/dev/lld-playground
+npx create-next-app@14 frontend --typescript --app --no-tailwind --eslint --src-dir=false --import-alias "@/*"
+cd frontend
+npm install @monaco-editor/react</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Write a typed API client</strong></p>
+<pre><code>// frontend/lib/api.ts
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+
+export type ProblemSummary = { id: string; title: string; summary: string };
+export type ProblemDetail = {
+  id: string;
+  statement: string;
+  required_signature: string;
+  explanation?: string;
+};
+export type SubmitResult = {
+  passed: boolean;
+  results?: { name: string; passed: boolean; message?: string }[];
+  error?: string;
+  message?: string;
+};
+
+export async function listProblems(): Promise<ProblemSummary[]> {
+  const res = await fetch(`${API_BASE}/problems`);
+  if (!res.ok) throw new Error("Failed to load problems");
+  return res.json();
+}
+
+export async function getProblem(id: string, solved: boolean): Promise<ProblemDetail> {
+  const res = await fetch(`${API_BASE}/problems/${id}?solved=${solved}`);
+  if (!res.ok) throw new Error("Failed to load problem");
+  return res.json();
+}
+
+export async function submitSolution(id: string, code: string): Promise<SubmitResult> {
+  const res = await fetch(`${API_BASE}/problems/${id}/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (res.status === 429) {
+    return { passed: false, error: "rate_limited", message: "Too many submissions - slow down." };
+  }
+  return res.json();
+}</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write the problem list page</strong></p>
+<pre><code>// frontend/app/page.tsx
+import Link from "next/link";
+import { listProblems } from "@/lib/api";
+
+export default async function Home() {
+  const problems = await listProblems();
+  return (
+    <main style={{ maxWidth: 700, margin: "2rem auto", fontFamily: "sans-serif" }}>
+      <h1>LLD Practice Playground</h1>
+      <ul>
+        {problems.map((p) => (
+          <li key={p.id} style={{ margin: "0.8rem 0" }}>
+            <Link href={`/problems/${p.id}`}>
+              <strong>{p.title}</strong>
+            </Link>
+            <p style={{ color: "#555" }}>{p.summary}</p>
+          </li>
+        ))}
+      </ul>
+    </main>
+  );
+}</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Manual verification</strong></p>
+<pre><code># terminal 1
+cd ~/dev/lld-playground/backend && uvicorn app.main:app --port 8000 --reload
+# terminal 2
+cd ~/dev/lld-playground/frontend && npm run dev</code></pre>
+<p>Open <code>http://localhost:3000</code> — expect a list of six problems with titles and summaries.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 5: Commit</strong></p>
+<pre><code>cd ~/dev/lld-playground
+git add frontend
+git commit -m "feat: scaffold Next.js frontend with problem list page"</code></pre>
+</div>
+
+<h3>Task 19: Problem detail page — editor, run/submit, localStorage progress, gated explanation tab</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>frontend/app/problems/[id]/page.tsx</code></li>
+<li>Create: <code>frontend/lib/progress.ts</code></li>
+</ul>
+</div>
+<div class="interfaces">
+<strong>Consumes:</strong> <code>getProblem</code>, <code>submitSolution</code> from Task 18's <code>lib/api.ts</code>.
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write the localStorage progress helper</strong></p>
+<pre><code>// frontend/lib/progress.ts
+const STORAGE_KEY = "lld-progress";
+
+type Progress = Record<string, { solved: boolean; lastCode?: string }>;
+
+function readAll(): Progress {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+function writeAll(progress: Progress): void {
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+}
+
+export function isSolved(problemId: string): boolean {
+  return readAll()[problemId]?.solved ?? false;
+}
+
+export function markSolved(problemId: string): void {
+  const progress = readAll();
+  progress[problemId] = { ...progress[problemId], solved: true };
+  writeAll(progress);
+}
+
+export function saveLastCode(problemId: string, code: string): void {
+  const progress = readAll();
+  progress[problemId] = { ...progress[problemId], solved: progress[problemId]?.solved ?? false, lastCode: code };
+  writeAll(progress);
+}
+
+export function loadLastCode(problemId: string): string | undefined {
+  return readAll()[problemId]?.lastCode;
+}</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Write the problem detail page (client component — needs state for the editor and submission result)</strong></p>
+<pre><code>// frontend/app/problems/[id]/page.tsx
+"use client";
+
+import { useEffect, useState } from "react";
+import Editor from "@monaco-editor/react";
+import { getProblem, submitSolution, ProblemDetail, SubmitResult } from "@/lib/api";
+import { isSolved, markSolved, saveLastCode, loadLastCode } from "@/lib/progress";
+
+export default function ProblemPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const [problem, setProblem] = useState<ProblemDetail | null>(null);
+  const [code, setCode] = useState("");
+  const [result, setResult] = useState<SubmitResult | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [solved, setSolved] = useState(false);
+
+  useEffect(() => {
+    const alreadySolved = isSolved(id);
+    setSolved(alreadySolved);
+    getProblem(id, alreadySolved).then(setProblem);
+    const saved = loadLastCode(id);
+    if (saved) setCode(saved);
+  }, [id]);
+
+  async function handleRun() {
+    setSubmitting(true);
+    saveLastCode(id, code);
+    const outcome = await submitSolution(id, code);
+    setResult(outcome);
+    if (outcome.passed) {
+      markSolved(id);
+      setSolved(true);
+      const refreshed = await getProblem(id, true);
+      setProblem(refreshed);
+    }
+    setSubmitting(false);
+  }
+
+  if (!problem) return <main style={{ padding: "2rem" }}>Loading...</main>;
+
+  return (
+    <main style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", padding: "1.5rem", fontFamily: "sans-serif" }}>
+      <section>
+        <h1>{id}</h1>
+        <h3>Problem statement</h3>
+        <pre style={{ whiteSpace: "pre-wrap" }}>{problem.statement}</pre>
+        <h3>Required signature</h3>
+        <pre>{problem.required_signature}</pre>
+        {problem.explanation ? (
+          <>
+            <h3>Design discussion</h3>
+            <pre style={{ whiteSpace: "pre-wrap" }}>{problem.explanation}</pre>
+          </>
+        ) : (
+          <p style={{ color: "#888" }}>Pass the hidden tests to unlock the design discussion.</p>
+        )}
+      </section>
+      <section>
+        <Editor
+          height="60vh"
+          defaultLanguage="python"
+          value={code}
+          onChange={(value) => setCode(value ?? "")}
+        />
+        <button onClick={handleRun} disabled={submitting} style={{ marginTop: "0.8rem" }}>
+          {submitting ? "Running..." : "Run"}
+        </button>
+        {result && (
+          <div style={{ marginTop: "1rem" }}>
+            <strong>{result.passed ? "All tests passed" : "Some tests failed"}</strong>
+            {result.error && <p>Error: {result.error} - {result.message}</p>}
+            <ul>
+              {result.results?.map((r) => (
+                <li key={r.name} style={{ color: r.passed ? "green" : "crimson" }}>
+                  {r.passed ? "✓" : "✗"} {r.name} {r.message ? `- ${r.message}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {solved && <p style={{ color: "green" }}>Solved ✓</p>}
+      </section>
+    </main>
+  );
+}</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Manual verification</strong></p>
+<p>With both servers from Task 18 still running, open <code>http://localhost:3000/problems/lru_cache</code>:</p>
+<ol>
+<li>Submit an empty/broken solution → expect per-test failures listed, explanation tab still says "Pass the hidden tests to unlock...".</li>
+<li>Submit a correct <code>LRUCache</code> implementation (e.g. the one from Task 12's harness test) → expect "All tests passed," "Solved ✓," and the design discussion section to appear.</li>
+<li>Reload the page → expect the explanation to still show (localStorage persisted) and the editor to still contain your last submitted code.</li>
+</ol>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Commit</strong></p>
+<pre><code>cd ~/dev/lld-playground
+git add frontend
+git commit -m "feat: add problem detail page with editor, run flow, and gated explanation"</code></pre>
+</div>
+
+<hr>
+
+<h2>Phase G — Local orchestration</h2>
+
+<h3>Task 20: <code>docker-compose.yml</code> for local dev</h3>
+<div class="files">
+<strong>Files:</strong>
+<ul>
+<li>Create: <code>docker-compose.yml</code></li>
+<li>Create: <code>backend/Dockerfile</code></li>
+<li>Create: <code>executor/Dockerfile</code> (the executor's own service container — distinct from <code>runner_image/Dockerfile</code>, which is the per-submission sandbox image)</li>
+</ul>
+</div>
+
+<div class="step">
+<p><strong>Step 1: Write <code>backend/Dockerfile</code></strong></p>
+<pre><code># backend/Dockerfile
+FROM python:3.12.7-slim
+WORKDIR /app
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e .
+COPY app app
+COPY content content
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 2: Write <code>executor/Dockerfile</code> (note: this service needs the host's Docker socket to launch sandbox containers — it is the only service granted that access, per the spec's component boundary)</strong></p>
+<pre><code># executor/Dockerfile
+FROM python:3.12.7-slim
+RUN apt-get update && apt-get install -y --no-install-recommends docker.io && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY pyproject.toml .
+RUN pip install --no-cache-dir -e .
+COPY app app
+EXPOSE 8001
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]</code></pre>
+</div>
+
+<div class="step">
+<p><strong>Step 3: Write <code>docker-compose.yml</code></strong></p>
+<pre><code># docker-compose.yml
+services:
+  api:
+    build: ./backend
+    ports: ["8000:8000"]
+    environment:
+      - EXECUTOR_URL=http://executor:8001
+    depends_on: [executor]
+
+  executor:
+    build: ./executor
+    ports: ["8001:8001"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - RUNNER_IMAGE=lld-runner:latest
+
+  frontend:
+    build: ./frontend
+    ports: ["3000:3000"]
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://localhost:8000
+    depends_on: [api]</code></pre>
+<p>Update <code>backend/app/executor_client.py</code>'s <code>EXECUTOR_URL</code> to read from the <code>EXECUTOR_URL</code> env var (falling back to <code>http://localhost:8001</code> for non-Docker local runs), since compose resolves the executor by service name rather than <code>localhost</code>.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 4: Update <code>executor_client.py</code> and verify</strong></p>
+<pre><code># backend/app/executor_client.py (edit the top)
+import os
+
+import httpx
+
+EXECUTOR_URL = os.environ.get("EXECUTOR_URL", "http://localhost:8001")</code></pre>
+<pre><code>cd ~/dev/lld-playground
+docker build -f executor/runner_image/Dockerfile -t lld-runner:latest executor
+docker compose up --build</code></pre>
+<p>Expected: all three services start; <code>http://localhost:3000</code> works end-to-end against the composed stack.</p>
+<p><strong>Troubleshooting:</strong> if the executor container's <code>docker</code> CLI calls fail with a permission error against <code>/var/run/docker.sock</code>, the container's effective user doesn't have access to the socket's group ID on your host (this varies by OS/Docker Desktop version). Fix by adding the matching GID to the executor image's user, or — simplest for local dev — running the executor container as root in <code>docker-compose.yml</code> (<code>user: root</code>), which is acceptable here since it's `executor`'s whole job to hold that privilege, not a privilege escalation.</p>
+</div>
+
+<div class="step">
+<p><strong>Step 5: Commit</strong></p>
+<pre><code>git add docker-compose.yml backend/Dockerfile executor/Dockerfile backend/app/executor_client.py
+git commit -m "feat: add docker-compose for local orchestration"</code></pre>
+</div>
+
+<hr>
+
+<h2>GSTACK REVIEW REPORT</h2>
+
+<h3>Data flow</h3>
+<pre><code>┌──────────┐   HTTP (fetch)    ┌─────────────┐   HTTP (httpx)    ┌───────────┐
+│ frontend │ ────────────────> │   backend   │ ────────────────> │ executor  │
+│ (Next.js)│ <──────────────── │  (FastAPI)  │ <──────────────── │ (FastAPI) │
+└──────────┘      JSON         └──────┬──────┘      JSON         └─────┬─────┘
+                                       │ reads                         │ docker run
+                                       ▼                                │ (argv list,
+                               content/problems/*                      │  never shell)
+                               (README, explanation,                    ▼
+                                required signature)           ┌─────────────────────┐
+                                                                │ per-submission       │
+                                                                │ container:           │
+                                                                │  --network none      │
+                                                                │  --read-only         │
+                                                                │  non-root, capped    │
+                                                                │  cpu/mem/pids/timeout │
+                                                                └─────────────────────┘
+
+Only `executor` ever touches the Docker socket. `backend` never does —
+that boundary is the entire reason the plan has three services instead
+of two.</code></pre>
+
+<h3>Step 0 — scope challenge</h3>
+<ul>
+<li><strong>Reuse:</strong> no existing code in <code>systemdesign-docs</code> solves this; the six problems' <code>solutions/python/*.py</code> are reused as the basis for hidden tests and "must pass" fixtures rather than rebuilt from scratch.</li>
+<li><strong>Minimum change / complexity smell:</strong> the plan introduces 3 services and far more than 8 files, which trips this skill's generic complexity trigger. Re-examined rather than re-asked: the frontend/backend/executor split is an explicit, already-approved decision from this session's brainstorming (the whole point is that the public-facing service never touches the Docker socket). Collapsing it to 2 services would be a real regression of the security boundary the design spec calls out by name — not cut.</li>
+<li><strong>Distribution:</strong> out of scope by design — this is a local dev tool (<code>docker-compose up</code>), not a published artifact. No CI/release pipeline needed for v1.</li>
+</ul>
+
+<h3>Findings</h3>
+<table>
+<tr><th>Area</th><th>Finding</th><th>Resolution</th></tr>
+<tr><td>Security / Docs</td><td>Mounting the host's Docker socket into <code>executor</code> grants it root-equivalent host access; this wasn't documented anywhere a future reader would see it.</td><td>Fixed — extended the root <code>README.md</code> security note (Task 1) with an explicit warning and a "never expose beyond localhost" line.</td></tr>
+<tr><td>Tests (real bug)</td><td><code>test_submit_is_rate_limited_after_ten_requests_per_minute</code> (Task 17) shared slowapi's in-memory limiter state with the two tests before it in the same file — all keyed to the same TestClient address — making the "exactly 10 then 429" assertion order-dependent and flaky.</td><td>Fixed — added an <code>autouse</code> pytest fixture that calls <code>app.state.limiter.reset()</code> before every test in that file.</td></tr>
+<tr><td>Ops</td><td>Docker socket GID mismatches between host and container are a well-known footgun for this exact pattern (executor needs permission to talk to <code>/var/run/docker.sock</code>), and Task 20 had no guidance for when it bites.</td><td>Fixed — added a troubleshooting note to Task 20's verification step.</td></tr>
+<tr><td>Architecture / timeliness</td><td>Task 18 scaffolded with <code>create-next-app@latest</code> while Task 19's page component reads route <code>params</code> synchronously — Next.js 15 made <code>params</code> an async Promise, so "latest" could silently break the plan's code depending on exactly when it's executed.</td><td>Resolved per your choice — pinned to <code>create-next-app@14</code>, noted in Global Constraints.</td></tr>
+<tr><td>Code quality (DRY)</td><td>Tasks 7–11's hidden-test unit tests each redefine an identical <code>_fails(test_fn, cls)</code> helper. Real duplication, but collapsing it now would violate the plan's own "No Placeholders" rule (each task must be readable independently, out of order) — it's a deliberate plan-format tradeoff, not an oversight.</td><td>Not changed in the plan — deferred to this session's loop, which already runs a <code>simplify</code> stage after tasks land and before review; that's the right point to extract a shared <code>executor/tests/conftest.py</code> helper.</td></tr>
+</table>
+
+<h3>Runs</h3>
+<p>No code exists yet to execute — this is a plan review, not a diff review. Each task's own TDD steps (write failing test → run → implement → run → commit) are the executable verification; there is nothing to run against the plan file itself beyond the consistency checks above (class names, method signatures, and Docker paths cross-checked across all 20 tasks).</p>
+
+<h3>VERDICT</h3>
+<p>Plan is sound and ready to execute. Architecture matches the approved design spec exactly, including the security-driven service split. Hidden test suites exercise both a correct reference implementation and a deliberately broken stub for all six problems. Sandbox isolation (network, filesystem, timeout) has a dedicated integration test, not just a claim that the container flags will handle it. All four real findings from this review were resolved inline; the one deliberate non-fix (test-helper duplication) is explicitly deferred to the loop's existing <code>simplify</code> stage rather than silently dropped.</p>
+
+<p>NO UNRESOLVED DECISIONS</p>
+
+</body>
+</html>

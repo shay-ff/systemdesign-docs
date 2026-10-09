@@ -1,0 +1,201 @@
+@startuml
+' Calendar / Meeting Scheduler - class diagram (Java 11, no packages)
+
+class User {
+  - userId: String
+  - name: String
+  - zone: ZoneId
+  + getUserId(): String
+  + getZone(): ZoneId
+}
+
+class TimeSlot <<value object>> {
+  - start: ZonedDateTime  ' always normalized to UTC
+  - end: ZonedDateTime
+  + TimeSlot(start, end)
+  + overlaps(other: TimeSlot): boolean
+  + containsInstant(t: ZonedDateTime): boolean
+  + durationMinutes(): long
+  + formatIn(zone: ZoneId): String
+  + withZoneSameInstantUTC(...): TimeSlot
+}
+
+enum RSVP {
+  PENDING
+  ACCEPTED
+  DECLINED
+  TENTATIVE
+}
+
+enum RecurrenceType {
+  DAILY
+  WEEKLY
+}
+
+class Meeting {
+  - meetingId: String
+  - title: String
+  - organizer: User
+  - participants: Set<User>
+  - anchorSlot: TimeSlot
+  - rule: RecurrenceRule  ' null = single meeting
+  - room: Room
+  - skippedOccurrences: Set<ZonedDateTime>
+  - rsvps: Map<String, RSVP>
+  + isOccurrenceSkipped(start: ZonedDateTime): boolean
+  + respond(user: User, rsvp: RSVP): void
+  + allOccurrences(from, to): List<TimeSlot>
+}
+
+class Occurrence {
+  - meeting: Meeting
+  - slot: TimeSlot
+  + formatIn(zone: ZoneId): String
+}
+
+interface RecurrenceRule <<strategy>> {
+  + occurrencesBetween(anchor: TimeSlot, from: ZonedDateTime, to: ZonedDateTime): List<TimeSlot>
+  + expand(anchor: TimeSlot, count: int): List<TimeSlot>
+  + nextStart(after: ZonedDateTime): ZonedDateTime
+  + getType(): RecurrenceType
+  + getInterval(): int
+  + describe(): String
+}
+
+class DailyRecurrenceRule implements RecurrenceRule {
+  - interval: int  ' every N days
+  - count: Integer  ' null = unbounded (use until-window)
+  - until: LocalDate
+  + occurrencesBetween(...): List<TimeSlot>
+}
+
+class WeeklyRecurrenceRule implements RecurrenceRule {
+  - interval: int  ' every N weeks
+  - count: Integer
+  - until: LocalDate
+  + occurrencesBetween(...): List<TimeSlot>
+}
+
+class Room {
+  - roomId: String
+  - name: String
+  - capacity: int
+  - busySlots: List<TimeSlot>  ' same engine as people
+  + isFree(slot: TimeSlot): boolean
+  + findConflicts(slot: TimeSlot): List<TimeSlot>
+  + book(slot: TimeSlot): void
+  + release(slot: TimeSlot): void
+}
+
+class RoomInventory {
+  - rooms: List<Room>
+  + addRoom(room: Room): void
+  + search(minCapacity: int, slot: TimeSlot): List<Room>
+  + findById(roomId: String): Room
+}
+
+class Calendar {
+  - user: User
+  - busySlots: List<TimeSlot>  ' sorted by start
+  - meetingIds: Set<String>
+  + isFree(slot: TimeSlot): boolean
+  + findConflicts(slot: TimeSlot): List<TimeSlot>
+  + addBusy(slot: TimeSlot): void
+  + removeBusy(slot: TimeSlot): boolean
+}
+
+class CalendarService <<facade>> {
+  - users: Map<String, User>
+  - calendars: Map<String, Calendar>
+  - meetings: Map<String, Meeting>
+  - rooms: RoomInventory
+  - notifier: NotificationService
+  - slotFinder: FreeSlotFinder
+  + registerUser(user: User): void
+  + scheduleMeeting(title, organizer, participants, slot, rule, room): Meeting
+  + respondInvite(meetingId, user, rsvp): void
+  + cancelMeeting(meetingId): void
+  + skipOccurrence(meetingId, occurrenceStart): void
+  + searchRooms(minCapacity, slot): List<Room>
+  + findFreeSlots(users, fromDate, days, count): List<TimeSlot>
+  - checkConflicts(people, room, slot): String
+}
+
+class NotificationService <<observer subject>> {
+  - listeners: List<NotificationListener>
+  + subscribe(listener): void
+  + unsubscribe(listener): void
+  + notify(event: Notification): void
+}
+
+interface NotificationListener {
+  + onNotification(event: Notification): void
+}
+
+class ConsoleNotificationListener implements NotificationListener
+
+class Notification {
+  - kind: NotificationKind
+  - meetingId: String
+  - message: String
+}
+
+class FreeSlotFinder {
+  - workStartHour: int = 9
+  - workEndHour: int = 18
+  - slotMinutes: int = 30
+  + findFreeSlots(users, fromDate, days, count, requesterZone): List<TimeSlot>
+  - mergeOverlapping(slots: List<TimeSlot>): List<TimeSlot>
+}
+
+' Relationships
+CalendarService "1" o-- "many" User : registry
+User "1" -- "1" Calendar : has
+Calendar "1" o-- "many" TimeSlot : sorted busy list
+Meeting "many" --> "1" User : organizer
+Meeting "many" o-- "many" User : participants
+Meeting "1" *-- "1" TimeSlot : anchor slot
+Meeting "1" o-- "0..1" RecurrenceRule : strategy (null = single)
+Meeting "1" o-- "0..1" Room : optional
+Meeting "1" o-- "many" Occurrence : materialized on demand
+Occurrence "many" --> "1" TimeSlot
+RecurrenceRule <|.. DailyRecurrenceRule
+RecurrenceRule <|.. WeeklyRecurrenceRule
+RoomInventory "1" o-- "many" Room
+Room "1" o-- "many" TimeSlot : busy slots
+CalendarService "1" o-- "1" RoomInventory
+CalendarService "1" o-- "1" NotificationService
+CalendarService "1" o-- "1" FreeSlotFinder
+NotificationService "1" o-- "many" NotificationListener : observer
+NotificationListener <|.. ConsoleNotificationListener
+NotificationService ..> Notification : emits
+Meeting ..> RSVP : per-participant
+
+note bottom of CalendarService
+  THE CRUX: scheduleMeeting() must reject a slot
+  that overlaps any busy interval of the organizer,
+  every participant, and the room (if any).
+  DECLINED participants do not block; TENTATIVE do.
+end note
+
+note right of TimeSlot
+  Half-open [start, end), stored in UTC:
+  adjacent meetings (end == next start) are
+  ALLOWED; overlap check uses strict '<'.
+  formatIn(zone) renders local time.
+end note
+
+note bottom of RecurrenceRule
+  RRULE-lite: DAILY/WEEKLY x interval, bounded
+  by count or until date. Expanded LAZILY within
+  a bounded window - never materialize an
+  unbounded series. Full RFC 5545 RRULE is
+  explicitly out of scope (production note).
+end note
+
+note right of FreeSlotFinder
+  Merge each user's busy intervals, then sweep
+  the 09:00-18:00 local working hours in 30-min
+  steps for gaps where ALL users are free.
+end note
+@enduml

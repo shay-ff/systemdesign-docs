@@ -1,0 +1,1145 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "total_cards": 200,
+    "last_updated": "2024-10-29",
+    "description": "Comprehensive system design interview flashcards with spaced repetition support"
+  },
+  "categories": {
+    "fundamentals": "Core system design concepts and principles",
+    "databases": "Database design, scaling, and consistency",
+    "caching": "Caching strategies and patterns",
+    "messaging": "Message queues and communication patterns",
+    "scaling": "Horizontal and vertical scaling techniques",
+    "security": "Security patterns and best practices",
+    "monitoring": "Observability and monitoring strategies",
+    "architecture": "Architecture patterns and trade-offs",
+    "performance": "Performance optimization techniques",
+    "interview": "Interview-specific tips and frameworks"
+  },
+  "difficulty_levels": {
+    "beginner": "0-2 years experience",
+    "intermediate": "2-5 years experience", 
+    "advanced": "5+ years experience"
+  },
+  "cards": [
+    {
+      "id": 1,
+      "category": "fundamentals",
+      "difficulty": "beginner",
+      "question": "What is the CAP theorem?",
+      "answer": "CAP theorem states that in a distributed system, you can only guarantee two out of three properties: Consistency (all nodes see the same data), Availability (system remains operational), and Partition tolerance (system continues despite network failures).",
+      "tags": ["cap", "distributed-systems", "consistency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 2,
+      "category": "fundamentals",
+      "difficulty": "beginner",
+      "question": "What is horizontal vs vertical scaling?",
+      "answer": "Horizontal scaling (scale out) adds more servers to handle increased load. Vertical scaling (scale up) adds more power (CPU, RAM) to existing servers. Horizontal scaling is generally preferred for distributed systems as it provides better fault tolerance.",
+      "tags": ["scaling", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 3,
+      "category": "caching",
+      "difficulty": "beginner",
+      "question": "What is the cache-aside pattern?",
+      "answer": "Cache-aside (lazy loading): Application first checks cache, on miss reads from database and populates cache. The application manages the cache directly. Good for read-heavy workloads but can have cache misses on first access.",
+      "tags": ["caching", "patterns"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 4,
+      "category": "caching",
+      "difficulty": "beginner",
+      "question": "What is write-through caching?",
+      "answer": "Write-through: Data is written to both cache and database simultaneously. Ensures cache consistency but has higher write latency. Good when you need strong consistency between cache and database.",
+      "tags": ["caching", "patterns", "consistency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 5,
+      "category": "caching",
+      "difficulty": "intermediate",
+      "question": "What is write-behind (write-back) caching?",
+      "answer": "Write-behind: Data is written to cache immediately and to database asynchronously later. Provides low write latency but risks data loss if cache fails before database write. Good for write-heavy workloads.",
+      "tags": ["caching", "patterns", "performance"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 6,
+      "category": "databases",
+      "difficulty": "beginner",
+      "question": "What is ACID in databases?",
+      "answer": "ACID: Atomicity (all or nothing), Consistency (valid state transitions), Isolation (concurrent transactions don't interfere), Durability (committed data survives failures). These properties ensure reliable database transactions.",
+      "tags": ["databases", "transactions", "consistency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 7,
+      "category": "databases",
+      "difficulty": "intermediate",
+      "question": "What is BASE in NoSQL systems?",
+      "answer": "BASE: Basically Available (system is available), Soft state (data may change over time), Eventually consistent (system will become consistent over time). BASE is often contrasted with ACID for distributed systems.",
+      "tags": ["databases", "nosql", "consistency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 8,
+      "category": "databases",
+      "difficulty": "intermediate",
+      "question": "What is database sharding?",
+      "answer": "Sharding is horizontal partitioning where data is split across multiple databases based on a shard key. Each shard contains a subset of data. Helps with scalability but adds complexity for cross-shard queries and transactions.",
+      "tags": ["databases", "scaling", "partitioning"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 9,
+      "category": "databases",
+      "difficulty": "advanced",
+      "question": "What are the different database replication strategies?",
+      "answer": "Master-Slave: One write node, multiple read replicas. Master-Master: Multiple write nodes with conflict resolution. Synchronous: Waits for replica confirmation (strong consistency). Asynchronous: Doesn't wait (eventual consistency, better performance).",
+      "tags": ["databases", "replication", "consistency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 10,
+      "category": "messaging",
+      "difficulty": "beginner",
+      "question": "What is a message queue?",
+      "answer": "A message queue is a communication method where messages are stored in a queue until processed. Provides asynchronous communication, decoupling between producers and consumers, and helps handle traffic spikes by buffering messages.",
+      "tags": ["messaging", "queues", "async"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 11,
+      "category": "messaging",
+      "difficulty": "intermediate",
+      "question": "What is the difference between push and pull in messaging?",
+      "answer": "Push: Message broker sends messages to consumers immediately. Lower latency but can overwhelm slow consumers. Pull: Consumers request messages from broker. Better flow control and consumer can process at its own pace, but higher latency.",
+      "tags": ["messaging", "patterns"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 12,
+      "category": "messaging",
+      "difficulty": "advanced",
+      "question": "What are the message delivery guarantees?",
+      "answer": "At-most-once: Message delivered zero or one time (may lose messages). At-least-once: Message delivered one or more times (may duplicate). Exactly-once: Message delivered exactly once (hardest to implement, often approximated).",
+      "tags": ["messaging", "reliability", "guarantees"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 13,
+      "category": "architecture",
+      "difficulty": "beginner",
+      "question": "What is a load balancer?",
+      "answer": "A load balancer distributes incoming requests across multiple servers to prevent any single server from being overwhelmed. Improves availability, scalability, and performance by spreading the load evenly.",
+      "tags": ["load-balancing", "architecture", "scaling"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 14,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What are the different load balancing algorithms?",
+      "answer": "Round Robin: Requests distributed sequentially. Weighted Round Robin: Based on server capacity. Least Connections: Route to server with fewest active connections. IP Hash: Route based on client IP hash. Health-based: Consider server health status.",
+      "tags": ["load-balancing", "algorithms"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 15,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is a CDN (Content Delivery Network)?",
+      "answer": "CDN is a geographically distributed network of servers that cache content closer to users. Reduces latency, decreases server load, improves availability, and provides better user experience by serving content from the nearest edge location.",
+      "tags": ["cdn", "caching", "performance"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 16,
+      "category": "performance",
+      "difficulty": "beginner",
+      "question": "What is database indexing?",
+      "answer": "Database indexing creates a data structure that improves query performance by providing fast access paths to data. Like a book index, it allows the database to find rows quickly without scanning the entire table. Trade-off: faster reads, slower writes.",
+      "tags": ["databases", "performance", "indexing"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 17,
+      "category": "performance",
+      "difficulty": "intermediate",
+      "question": "What is connection pooling?",
+      "answer": "Connection pooling maintains a cache of database connections that can be reused across multiple requests. Reduces the overhead of creating/destroying connections, improves performance, and limits the number of concurrent connections to the database.",
+      "tags": ["databases", "performance", "optimization"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 18,
+      "category": "security",
+      "difficulty": "beginner",
+      "question": "What is rate limiting?",
+      "answer": "Rate limiting controls the number of requests a client can make within a specific time window. Prevents abuse, protects against DDoS attacks, ensures fair resource usage, and maintains system stability under high load.",
+      "tags": ["security", "rate-limiting", "protection"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 19,
+      "category": "security",
+      "difficulty": "intermediate",
+      "question": "What are the common rate limiting algorithms?",
+      "answer": "Token Bucket: Tokens added at fixed rate, requests consume tokens. Leaky Bucket: Requests processed at fixed rate. Fixed Window: Count requests in fixed time windows. Sliding Window: More accurate, tracks requests in rolling time window.",
+      "tags": ["rate-limiting", "algorithms", "security"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 20,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is consistent hashing?",
+      "answer": "Consistent hashing distributes data across nodes in a way that minimizes redistribution when nodes are added/removed. Uses a hash ring where both data and nodes are hashed to positions. Only affects adjacent nodes, making it ideal for distributed caches and databases.",
+      "tags": ["hashing", "distributed-systems", "scaling"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 21,
+      "category": "monitoring",
+      "difficulty": "beginner",
+      "question": "What are the key metrics to monitor in a system?",
+      "answer": "RED metrics: Rate (requests/sec), Errors (error rate), Duration (response time). USE metrics: Utilization (% busy), Saturation (queue length), Errors. Also monitor: CPU, memory, disk I/O, network I/O, database connections, cache hit ratio.",
+      "tags": ["monitoring", "metrics", "observability"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 22,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is microservices architecture?",
+      "answer": "Microservices break applications into small, independent services that communicate over APIs. Benefits: independent deployment, technology diversity, fault isolation. Challenges: network complexity, data consistency, service discovery, distributed debugging.",
+      "tags": ["microservices", "architecture", "distributed-systems"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 23,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is eventual consistency?",
+      "answer": "Eventual consistency guarantees that if no new updates are made, all replicas will eventually converge to the same value. Provides high availability and partition tolerance but may have temporary inconsistencies. Common in distributed systems like DNS, social media feeds.",
+      "tags": ["consistency", "distributed-systems", "cap"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 24,
+      "category": "databases",
+      "difficulty": "intermediate",
+      "question": "What is the difference between SQL and NoSQL databases?",
+      "answer": "SQL: Structured data, ACID properties, complex queries, vertical scaling. NoSQL: Flexible schema, BASE properties, simple queries, horizontal scaling. Types: Document (MongoDB), Key-Value (Redis), Column (Cassandra), Graph (Neo4j).",
+      "tags": ["databases", "sql", "nosql"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 25,
+      "category": "performance",
+      "difficulty": "advanced",
+      "question": "What is database denormalization and when to use it?",
+      "answer": "Denormalization intentionally introduces redundancy to improve read performance by reducing joins. Use when: read-heavy workloads, complex joins are expensive, acceptable data redundancy. Trade-off: faster reads vs more storage and complex updates.",
+      "tags": ["databases", "performance", "optimization"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 26,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is an API Gateway?",
+      "answer": "API Gateway is a server that acts as an entry point for microservices. Handles: request routing, authentication, rate limiting, request/response transformation, monitoring, caching. Provides a single interface for clients and centralizes cross-cutting concerns.",
+      "tags": ["api-gateway", "microservices", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 27,
+      "category": "fundamentals",
+      "difficulty": "beginner",
+      "question": "What is idempotency in system design?",
+      "answer": "Idempotency means performing the same operation multiple times has the same effect as performing it once. Critical for retry mechanisms and ensuring system reliability. Examples: GET requests, setting a value to specific state, using unique transaction IDs.",
+      "tags": ["idempotency", "reliability", "apis"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 28,
+      "category": "messaging",
+      "difficulty": "intermediate",
+      "question": "What is the publish-subscribe pattern?",
+      "answer": "Pub-Sub decouples message producers (publishers) from consumers (subscribers) through topics/channels. Publishers send messages to topics, subscribers receive messages from topics they're interested in. Enables one-to-many communication and loose coupling.",
+      "tags": ["messaging", "pub-sub", "patterns"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 29,
+      "category": "security",
+      "difficulty": "intermediate",
+      "question": "What is OAuth 2.0?",
+      "answer": "OAuth 2.0 is an authorization framework that allows third-party applications to access user resources without exposing credentials. Uses access tokens with limited scope and lifetime. Common flows: Authorization Code, Client Credentials, Resource Owner Password.",
+      "tags": ["security", "oauth", "authentication"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 30,
+      "category": "performance",
+      "difficulty": "intermediate",
+      "question": "What is lazy loading?",
+      "answer": "Lazy loading defers loading of resources until they're actually needed. Reduces initial load time and memory usage. Examples: loading images on scroll, database relationships on access, code splitting in web apps. Trade-off: initial speed vs potential delays later.",
+      "tags": ["performance", "optimization", "lazy-loading"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 31,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the Two-Phase Commit protocol?",
+      "answer": "2PC ensures atomicity in distributed transactions. Phase 1: Coordinator asks all participants to prepare (vote). Phase 2: If all vote yes, coordinator sends commit; if any vote no, sends abort. Provides strong consistency but can block if coordinator fails.",
+      "tags": ["distributed-systems", "transactions", "consistency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 32,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is the Saga pattern?",
+      "answer": "Saga manages distributed transactions as a sequence of local transactions. Each step has a compensating action for rollback. Two types: Choreography (events), Orchestration (central coordinator). Provides eventual consistency without locking resources.",
+      "tags": ["saga", "distributed-systems", "transactions"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 33,
+      "category": "caching",
+      "difficulty": "intermediate",
+      "question": "What are cache eviction policies?",
+      "answer": "LRU (Least Recently Used): Evict least recently accessed. LFU (Least Frequently Used): Evict least frequently accessed. FIFO: First in, first out. Random: Random eviction. TTL: Time-based expiration. Choice depends on access patterns and requirements.",
+      "tags": ["caching", "eviction", "algorithms"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 34,
+      "category": "databases",
+      "difficulty": "advanced",
+      "question": "What is the difference between optimistic and pessimistic locking?",
+      "answer": "Optimistic: Assumes conflicts are rare, checks for conflicts at commit time using version numbers. Better performance, risk of rollbacks. Pessimistic: Locks resources immediately, prevents conflicts but can cause deadlocks and reduced concurrency.",
+      "tags": ["databases", "locking", "concurrency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 35,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is a circuit breaker pattern?",
+      "answer": "Circuit breaker prevents cascading failures by monitoring service calls. States: Closed (normal), Open (failing, reject calls), Half-Open (testing recovery). Automatically opens on failure threshold, closes when service recovers. Provides fast failure and system protection.",
+      "tags": ["circuit-breaker", "reliability", "patterns"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 36,
+      "category": "messaging",
+      "difficulty": "advanced",
+      "question": "What is event sourcing?",
+      "answer": "Event sourcing stores all changes as a sequence of events rather than current state. Benefits: complete audit trail, temporal queries, replay capability. Challenges: event schema evolution, snapshot complexity, eventual consistency. Often paired with CQRS.",
+      "tags": ["event-sourcing", "patterns", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 37,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is CQRS (Command Query Responsibility Segregation)?",
+      "answer": "CQRS separates read and write operations into different models. Commands modify state, queries read state. Allows independent optimization of reads and writes, different data models, and better scalability. Often used with event sourcing.",
+      "tags": ["cqrs", "patterns", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 38,
+      "category": "performance",
+      "difficulty": "beginner",
+      "question": "What is the difference between latency and throughput?",
+      "answer": "Latency: Time to process a single request (response time). Throughput: Number of requests processed per unit time (requests/second). They're related but different - you can have high throughput with high latency (batch processing) or low latency with low throughput.",
+      "tags": ["performance", "metrics", "latency"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 39,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is a distributed hash table (DHT)?",
+      "answer": "DHT is a distributed system that provides a lookup service similar to a hash table. Key-value pairs are distributed across nodes using consistent hashing. Each node is responsible for a range of keys. Examples: BitTorrent, Amazon Dynamo, Apache Cassandra.",
+      "tags": ["dht", "distributed-systems", "hashing"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 40,
+      "category": "security",
+      "difficulty": "advanced",
+      "question": "What is zero-trust security architecture?",
+      "answer": "Zero-trust assumes no implicit trust based on network location. Every request is authenticated, authorized, and encrypted. Principles: verify explicitly, least privilege access, assume breach. Implements micro-segmentation, continuous monitoring, and identity-based security.",
+      "tags": ["security", "zero-trust", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 41,
+      "category": "interview",
+      "difficulty": "beginner",
+      "question": "What should you do first in a system design interview?",
+      "answer": "Clarify requirements! Ask about functional requirements (what features), non-functional requirements (scale, performance, availability), constraints, and assumptions. Don't jump into solution immediately. Spend 8-12 minutes understanding the problem thoroughly.",
+      "tags": ["interview", "requirements", "process"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 42,
+      "category": "interview",
+      "difficulty": "beginner",
+      "question": "How should you approach capacity estimation?",
+      "answer": "Use back-of-envelope calculations: estimate users, requests/second, data storage, bandwidth. Use round numbers for easier math. Show your work and assumptions. Typical factors: 100:1 read/write ratio, 3x peak traffic, 80/20 rule for popular content.",
+      "tags": ["interview", "estimation", "capacity"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 43,
+      "category": "interview",
+      "difficulty": "intermediate",
+      "question": "How do you handle follow-up questions in interviews?",
+      "answer": "Listen carefully, acknowledge the question, think before answering. If you don't know, say so and explain your thought process. Discuss trade-offs and alternatives. Ask clarifying questions if needed. Stay calm and methodical in your approach.",
+      "tags": ["interview", "communication", "strategy"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 44,
+      "category": "interview",
+      "difficulty": "intermediate",
+      "question": "What's the best way to present your architecture?",
+      "answer": "Start with high-level overview, then dive into components. Draw clear diagrams with labeled components. Explain data flow and user journey. Justify your choices and discuss alternatives. Be prepared to go deeper into any component when asked.",
+      "tags": ["interview", "presentation", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 45,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the Byzantine Generals Problem?",
+      "answer": "Byzantine Generals Problem addresses consensus in distributed systems with potentially malicious actors. Some nodes may send conflicting information. Solutions include Byzantine Fault Tolerant (BFT) algorithms that can tolerate up to 1/3 malicious nodes.",
+      "tags": ["distributed-systems", "consensus", "byzantine"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 46,
+      "category": "databases",
+      "difficulty": "advanced",
+      "question": "What is the difference between strong and eventual consistency?",
+      "answer": "Strong consistency: All reads receive the most recent write immediately. Requires coordination, higher latency. Eventual consistency: System will become consistent over time, but reads may return stale data temporarily. Better availability and performance.",
+      "tags": ["consistency", "databases", "distributed-systems"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 47,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is service discovery?",
+      "answer": "Service discovery allows services to find and communicate with each other without hard-coding locations. Types: Client-side (client queries registry), Server-side (load balancer queries registry). Examples: Consul, etcd, Eureka, Kubernetes DNS.",
+      "tags": ["service-discovery", "microservices", "architecture"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 48,
+      "category": "performance",
+      "difficulty": "advanced",
+      "question": "What is database connection pooling and why is it important?",
+      "answer": "Connection pooling maintains a cache of database connections that can be reused. Creating connections is expensive (TCP handshake, authentication, etc.). Pooling reduces latency, limits concurrent connections, and improves resource utilization. Configure pool size based on workload.",
+      "tags": ["databases", "performance", "connection-pooling"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 49,
+      "category": "messaging",
+      "difficulty": "advanced",
+      "question": "What is the difference between message queues and event streams?",
+      "answer": "Message queues: Point-to-point, messages consumed once, temporary storage. Event streams: Publish-subscribe, messages can be consumed multiple times, persistent log. Queues for task distribution, streams for event processing and analytics.",
+      "tags": ["messaging", "queues", "streams"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 50,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is a bloom filter?",
+      "answer": "Bloom filter is a probabilistic data structure that tests set membership. Can have false positives but never false negatives. Space-efficient for large datasets. Used in databases, caches, and distributed systems to avoid expensive lookups for non-existent items.",
+      "tags": ["bloom-filter", "data-structures", "probabilistic"],
+      "spaced_repetition": {
+        "ease_factor": 2.5,
+        "interval": 1,
+        "repetitions": 0
+      }
+    },
+    {
+      "id": 51,
+      "category": "caching",
+      "difficulty": "advanced",
+      "question": "What is cache stampede and how do you prevent it?",
+      "answer": "Cache stampede occurs when multiple requests try to regenerate the same expired cache entry simultaneously. Prevention: use locks/semaphores, probabilistic early expiration, background refresh, or cache warming strategies.",
+      "tags": ["caching", "performance", "concurrency"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 52,
+      "category": "databases",
+      "difficulty": "intermediate",
+      "question": "What is database partitioning vs sharding?",
+      "answer": "Partitioning splits data within a single database instance (horizontal/vertical). Sharding distributes data across multiple database instances. Partitioning is easier to manage, sharding provides better scalability but adds complexity.",
+      "tags": ["databases", "partitioning", "sharding"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 53,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is the Bulkhead pattern?",
+      "answer": "Bulkhead pattern isolates critical resources to prevent cascading failures. Like ship compartments, if one fails, others remain functional. Examples: separate thread pools, connection pools, or services for different operations.",
+      "tags": ["bulkhead", "reliability", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 54,
+      "category": "performance",
+      "difficulty": "intermediate",
+      "question": "What is database read replica lag?",
+      "answer": "Read replica lag is the delay between a write to master and its availability on read replicas. Caused by network latency, replication overhead, or replica load. Can lead to reading stale data. Monitor and consider in application design.",
+      "tags": ["databases", "replication", "consistency"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 55,
+      "category": "messaging",
+      "difficulty": "intermediate",
+      "question": "What is dead letter queue?",
+      "answer": "Dead letter queue stores messages that couldn't be processed successfully after multiple retry attempts. Prevents infinite retry loops, allows investigation of problematic messages, and maintains system stability.",
+      "tags": ["messaging", "error-handling", "reliability"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 56,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the Raft consensus algorithm?",
+      "answer": "Raft is a consensus algorithm for managing replicated logs. Uses leader election, log replication, and safety mechanisms. Simpler than Paxos, ensures strong consistency in distributed systems. Used in etcd, Consul.",
+      "tags": ["raft", "consensus", "distributed-systems"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 57,
+      "category": "security",
+      "difficulty": "intermediate",
+      "question": "What is JWT (JSON Web Token)?",
+      "answer": "JWT is a compact, URL-safe token format for securely transmitting information. Contains header, payload, and signature. Stateless, self-contained, but can't be revoked easily. Good for distributed systems, bad for sensitive long-lived sessions.",
+      "tags": ["jwt", "security", "authentication"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 58,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is the Strangler Fig pattern?",
+      "answer": "Strangler Fig gradually replaces legacy systems by intercepting calls and routing them to new implementation. Allows incremental migration without big-bang replacement. Named after fig vines that gradually replace host trees.",
+      "tags": ["strangler-fig", "migration", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 59,
+      "category": "performance",
+      "difficulty": "advanced",
+      "question": "What is database query optimization?",
+      "answer": "Query optimization improves database performance through: proper indexing, query rewriting, join optimization, avoiding N+1 queries, using EXPLAIN plans, denormalization when needed, and connection pooling.",
+      "tags": ["databases", "optimization", "performance"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 60,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is graceful degradation?",
+      "answer": "Graceful degradation maintains core functionality when parts of the system fail. Examples: serving cached data when database is down, disabling non-essential features, showing simplified UI. Improves user experience during failures.",
+      "tags": ["reliability", "degradation", "fault-tolerance"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 61,
+      "category": "caching",
+      "difficulty": "intermediate",
+      "question": "What is cache warming?",
+      "answer": "Cache warming pre-loads cache with frequently accessed data before it's requested. Prevents cold start problems, improves initial response times. Can be done during deployment, scheduled jobs, or background processes.",
+      "tags": ["caching", "performance", "optimization"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 62,
+      "category": "databases",
+      "difficulty": "advanced",
+      "question": "What is database connection leaking?",
+      "answer": "Connection leaking occurs when database connections aren't properly closed, exhausting the connection pool. Causes: exceptions not handled, missing finally blocks, improper resource management. Use try-with-resources or connection pooling libraries.",
+      "tags": ["databases", "connection-pooling", "resource-management"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 63,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is the Ambassador pattern?",
+      "answer": "Ambassador pattern places helper services alongside main application to handle cross-cutting concerns like logging, monitoring, security, networking. Often implemented as sidecar containers in microservices architectures.",
+      "tags": ["ambassador", "sidecar", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 64,
+      "category": "messaging",
+      "difficulty": "advanced",
+      "question": "What is message deduplication?",
+      "answer": "Message deduplication ensures each message is processed only once, even if delivered multiple times. Techniques: idempotent operations, unique message IDs, deduplication windows, exactly-once semantics in message brokers.",
+      "tags": ["messaging", "deduplication", "idempotency"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 65,
+      "category": "performance",
+      "difficulty": "intermediate",
+      "question": "What is the difference between sync and async processing?",
+      "answer": "Synchronous: Caller waits for operation to complete, simpler but can block. Asynchronous: Caller doesn't wait, continues processing, better throughput but more complex error handling and state management.",
+      "tags": ["async", "sync", "performance"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 66,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the Paxos algorithm?",
+      "answer": "Paxos is a consensus algorithm for distributed systems that ensures agreement among nodes even with failures. Complex but proven correct. Phases: Prepare, Promise, Accept, Accepted. Forms basis for many distributed systems.",
+      "tags": ["paxos", "consensus", "distributed-systems"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 67,
+      "category": "security",
+      "difficulty": "advanced",
+      "question": "What is defense in depth?",
+      "answer": "Defense in depth uses multiple layers of security controls. If one layer fails, others provide protection. Examples: firewalls, authentication, authorization, encryption, monitoring, input validation, network segmentation.",
+      "tags": ["security", "defense-in-depth", "layered-security"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 68,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is the Backend for Frontend (BFF) pattern?",
+      "answer": "BFF creates separate backend services for different frontend clients (web, mobile, IoT). Each BFF is tailored to specific client needs, reducing over-fetching and providing optimized APIs for each platform.",
+      "tags": ["bff", "api-design", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 69,
+      "category": "databases",
+      "difficulty": "intermediate",
+      "question": "What is database normalization?",
+      "answer": "Normalization organizes data to reduce redundancy and improve integrity. Forms: 1NF (atomic values), 2NF (no partial dependencies), 3NF (no transitive dependencies). Benefits: data integrity, storage efficiency. Cost: more joins.",
+      "tags": ["databases", "normalization", "design"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 70,
+      "category": "monitoring",
+      "difficulty": "intermediate",
+      "question": "What is distributed tracing?",
+      "answer": "Distributed tracing tracks requests across multiple services in microservices architectures. Creates trace spans showing request flow, timing, and errors. Tools: Jaeger, Zipkin, AWS X-Ray. Essential for debugging distributed systems.",
+      "tags": ["tracing", "monitoring", "microservices"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 71,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is backpressure?",
+      "answer": "Backpressure occurs when downstream systems can't keep up with upstream data flow. Handling strategies: buffering, dropping data, throttling producers, circuit breakers, or elastic scaling. Critical for system stability.",
+      "tags": ["backpressure", "flow-control", "reliability"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 72,
+      "category": "caching",
+      "difficulty": "advanced",
+      "question": "What is multi-level caching?",
+      "answer": "Multi-level caching uses multiple cache layers (L1: CPU cache, L2: application cache, L3: distributed cache, L4: CDN). Each level has different characteristics: speed, size, scope. Optimizes for different access patterns.",
+      "tags": ["caching", "multi-level", "hierarchy"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 73,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is the Hexagonal Architecture pattern?",
+      "answer": "Hexagonal Architecture (Ports and Adapters) isolates core business logic from external concerns. Core communicates through ports (interfaces), adapters implement ports for specific technologies. Improves testability and flexibility.",
+      "tags": ["hexagonal", "ports-adapters", "architecture"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 74,
+      "category": "performance",
+      "difficulty": "intermediate",
+      "question": "What is database connection timeout?",
+      "answer": "Connection timeout limits how long to wait when establishing database connections. Prevents hanging on unreachable databases. Set based on network conditions and SLA requirements. Too low causes false failures, too high causes delays.",
+      "tags": ["databases", "timeout", "configuration"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 75,
+      "category": "messaging",
+      "difficulty": "intermediate",
+      "question": "What is message ordering in distributed systems?",
+      "answer": "Message ordering ensures messages are processed in correct sequence. Challenges: network delays, parallel processing, failures. Solutions: single partition per key, sequence numbers, vector clocks, or accepting eventual consistency.",
+      "tags": ["messaging", "ordering", "consistency"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 76,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the CAP theorem trade-offs in practice?",
+      "answer": "CA: Traditional RDBMS (single node). CP: MongoDB, Redis Cluster (sacrifice availability during partitions). AP: Cassandra, DynamoDB (sacrifice consistency). Most systems choose AP or CP, pure CA doesn't exist in distributed systems.",
+      "tags": ["cap", "trade-offs", "distributed-systems"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 77,
+      "category": "security",
+      "difficulty": "intermediate",
+      "question": "What is SQL injection and how to prevent it?",
+      "answer": "SQL injection attacks insert malicious SQL code through user inputs. Prevention: parameterized queries, input validation, least privilege database access, stored procedures, ORM frameworks, regular security audits.",
+      "tags": ["security", "sql-injection", "prevention"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 78,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is the Database per Service pattern?",
+      "answer": "Each microservice owns its database, ensuring loose coupling and independent scaling. Benefits: service autonomy, technology diversity. Challenges: data consistency across services, complex queries, transaction management.",
+      "tags": ["microservices", "database-per-service", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 79,
+      "category": "performance",
+      "difficulty": "advanced",
+      "question": "What is database query plan optimization?",
+      "answer": "Query plan optimization involves analyzing execution plans to improve performance. Techniques: index usage, join order optimization, statistics updates, query rewriting, avoiding table scans, proper WHERE clause ordering.",
+      "tags": ["databases", "query-optimization", "performance"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 80,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is eventual consistency vs strong consistency?",
+      "answer": "Strong consistency: All reads get the latest write immediately, requires coordination. Eventual consistency: System becomes consistent over time, allows temporary inconsistencies for better availability and performance.",
+      "tags": ["consistency", "distributed-systems", "trade-offs"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 81,
+      "category": "caching",
+      "difficulty": "intermediate",
+      "question": "What is cache coherence?",
+      "answer": "Cache coherence ensures all caches have consistent view of data when multiple caches store the same data. Protocols: write-through, write-invalidate, directory-based. Important in multi-level caching and distributed caches.",
+      "tags": ["caching", "coherence", "consistency"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 82,
+      "category": "databases",
+      "difficulty": "advanced",
+      "question": "What is database hot spotting?",
+      "answer": "Hot spotting occurs when certain database partitions receive disproportionate load. Causes: poor sharding key choice, temporal data patterns. Solutions: better shard key design, pre-splitting, load balancing, caching hot data.",
+      "tags": ["databases", "hot-spotting", "sharding"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 83,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is the Outbox pattern?",
+      "answer": "Outbox pattern ensures reliable message publishing by storing events in the same database transaction as business data. A separate process publishes events from the outbox table. Guarantees at-least-once delivery without distributed transactions.",
+      "tags": ["outbox", "messaging", "reliability"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 84,
+      "category": "messaging",
+      "difficulty": "advanced",
+      "question": "What is message partitioning in event streaming?",
+      "answer": "Message partitioning distributes messages across multiple partitions based on key. Ensures ordering within partition, enables parallel processing, and scales throughput. Key design affects load distribution and consumer parallelism.",
+      "tags": ["messaging", "partitioning", "streaming"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 85,
+      "category": "performance",
+      "difficulty": "intermediate",
+      "question": "What is database read/write splitting?",
+      "answer": "Read/write splitting routes write operations to master database and read operations to read replicas. Improves performance by distributing load, but introduces complexity in handling replication lag and consistency requirements.",
+      "tags": ["databases", "read-write-split", "scaling"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 86,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the Split-brain problem?",
+      "answer": "Split-brain occurs when network partition causes multiple nodes to believe they're the leader, potentially causing data corruption. Solutions: quorum-based decisions, fencing mechanisms, witness nodes, or accepting temporary unavailability.",
+      "tags": ["split-brain", "distributed-systems", "consensus"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 87,
+      "category": "security",
+      "difficulty": "advanced",
+      "question": "What is certificate pinning?",
+      "answer": "Certificate pinning associates specific certificates or public keys with servers to prevent man-in-the-middle attacks. Client validates server certificate against pinned certificate. Improves security but requires careful certificate rotation management.",
+      "tags": ["security", "certificate-pinning", "tls"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 88,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is the Retry pattern?",
+      "answer": "Retry pattern automatically retries failed operations with strategies like exponential backoff, jitter, circuit breakers. Handles transient failures but can amplify problems if not implemented carefully. Include maximum retry limits and backoff strategies.",
+      "tags": ["retry", "resilience", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 89,
+      "category": "databases",
+      "difficulty": "intermediate",
+      "question": "What is database connection pooling configuration?",
+      "answer": "Key parameters: min/max pool size, connection timeout, idle timeout, validation query. Size based on concurrent users and database capacity. Monitor pool utilization, connection leaks, and adjust based on application patterns.",
+      "tags": ["databases", "connection-pooling", "configuration"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 90,
+      "category": "monitoring",
+      "difficulty": "intermediate",
+      "question": "What are SLIs, SLOs, and SLAs?",
+      "answer": "SLI (Service Level Indicator): Metrics measuring service performance. SLO (Service Level Objective): Target values for SLIs. SLA (Service Level Agreement): Contract with consequences for missing SLOs. Example: 99.9% uptime SLO.",
+      "tags": ["monitoring", "sli", "slo", "sla"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 91,
+      "category": "fundamentals",
+      "difficulty": "intermediate",
+      "question": "What is data locality?",
+      "answer": "Data locality places related data close together to minimize access time. Types: temporal (recently accessed), spatial (nearby memory addresses), geographic (close to users). Improves cache performance and reduces network latency.",
+      "tags": ["data-locality", "performance", "optimization"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 92,
+      "category": "caching",
+      "difficulty": "advanced",
+      "question": "What is cache invalidation strategies?",
+      "answer": "TTL: Time-based expiration. Event-based: Invalidate on data changes. Manual: Explicit invalidation calls. Tag-based: Group related cache entries. Write-through: Update cache on writes. Choose based on consistency requirements and update patterns.",
+      "tags": ["caching", "invalidation", "strategies"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 93,
+      "category": "architecture",
+      "difficulty": "advanced",
+      "question": "What is the Sidecar pattern?",
+      "answer": "Sidecar deploys helper components alongside main application in separate containers. Handles cross-cutting concerns like logging, monitoring, security, networking. Provides modularity and language independence in microservices.",
+      "tags": ["sidecar", "microservices", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 94,
+      "category": "messaging",
+      "difficulty": "intermediate",
+      "question": "What is message acknowledgment?",
+      "answer": "Message acknowledgment confirms successful message processing. Types: auto-ack (immediate), manual-ack (after processing), batch-ack (multiple messages). Ensures reliability but affects performance. Choose based on durability requirements.",
+      "tags": ["messaging", "acknowledgment", "reliability"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 95,
+      "category": "performance",
+      "difficulty": "advanced",
+      "question": "What is database denormalization trade-offs?",
+      "answer": "Denormalization trades storage and update complexity for read performance. Benefits: fewer joins, faster queries. Costs: data redundancy, update anomalies, increased storage. Use for read-heavy workloads with acceptable consistency trade-offs.",
+      "tags": ["databases", "denormalization", "trade-offs"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 96,
+      "category": "fundamentals",
+      "difficulty": "advanced",
+      "question": "What is the Gossip protocol?",
+      "answer": "Gossip protocol spreads information through network by nodes randomly sharing data with peers. Eventually reaches all nodes. Used for failure detection, membership, and configuration distribution. Examples: Cassandra, Consul.",
+      "tags": ["gossip", "distributed-systems", "protocols"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 97,
+      "category": "security",
+      "difficulty": "intermediate",
+      "question": "What is API rate limiting implementation?",
+      "answer": "Implement using algorithms like token bucket, sliding window. Store counters in fast storage (Redis). Consider: per-user limits, burst allowance, different limits per endpoint, graceful degradation when limits exceeded.",
+      "tags": ["api", "rate-limiting", "implementation"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 98,
+      "category": "architecture",
+      "difficulty": "intermediate",
+      "question": "What is the Adapter pattern in system design?",
+      "answer": "Adapter pattern allows incompatible interfaces to work together. In system design, adapters translate between different APIs, data formats, or protocols. Enables integration with legacy systems or third-party services.",
+      "tags": ["adapter", "integration", "patterns"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 99,
+      "category": "databases",
+      "difficulty": "advanced",
+      "question": "What is database transaction isolation levels?",
+      "answer": "Read Uncommitted: Dirty reads possible. Read Committed: No dirty reads. Repeatable Read: No phantom reads within transaction. Serializable: Strongest isolation. Higher isolation reduces concurrency but improves consistency.",
+      "tags": ["databases", "isolation", "transactions"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 100,
+      "category": "monitoring",
+      "difficulty": "advanced",
+      "question": "What is chaos engineering?",
+      "answer": "Chaos engineering intentionally introduces failures to test system resilience. Examples: killing services, network partitions, resource exhaustion. Helps identify weaknesses before they cause outages. Tools: Chaos Monkey, Gremlin.",
+      "tags": ["chaos-engineering", "resilience", "testing"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 101,
+      "category": "interview",
+      "difficulty": "intermediate",
+      "question": "How do you handle scaling bottlenecks in interviews?",
+      "answer": "Identify bottleneck first (CPU, memory, I/O, network). Propose solutions: horizontal scaling, caching, database optimization, CDN, load balancing. Discuss trade-offs and monitoring. Show systematic thinking and multiple approaches.",
+      "tags": ["interview", "scaling", "bottlenecks"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    },
+    {
+      "id": 102,
+      "category": "interview",
+      "difficulty": "advanced",
+      "question": "How do you discuss trade-offs effectively in interviews?",
+      "answer": "Present multiple options, explain pros/cons of each, consider context (scale, team, timeline), justify your choice, acknowledge alternatives. Example: 'We could use SQL for consistency or NoSQL for scale. Given our read-heavy workload, I'd choose NoSQL but monitor consistency carefully.'",
+      "tags": ["interview", "trade-offs", "decision-making"],
+      "spaced_repetition": {"ease_factor": 2.5, "interval": 1, "repetitions": 0}
+    }
+  ]
+}

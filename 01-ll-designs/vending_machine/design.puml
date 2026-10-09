@@ -1,0 +1,160 @@
+@startuml
+title Vending Machine — Class Diagram
+
+' ---- Money (physical, as enums) ----
+enum Coin {
+  ONE = 1
+  TWO = 2
+  FIVE = 5
+  TEN = 10
+  ' physical objects, not ints: a Coin.FIVE can only be a coin
+}
+
+enum Note {
+  TEN = 10
+  TWENTY = 20
+  FIFTY = 50
+  HUNDRED = 100
+  TWO_HUNDRED = 200
+  ' separate from Coin: note acceptor is its own hardware path;
+  ' notes are never dispensed as change in this machine
+}
+
+' ---- Catalog ----
+class Product {
+  - code: String
+  - name: String
+  - priceInRupees: int
+  + getCode(): String
+  + getName(): String
+  + getPriceInRupees(): int
+  + equals(o): boolean  ' identity by code
+  ' immutable catalog object; NOT the stock
+}
+
+class ProductInventory {
+  - stockByCode: Map<String, Integer>
+  + restock(code: String, quantity: int): void
+  + isAvailable(code: String): boolean
+  + availableQuantity(code: String): int
+  + commitDispense(code: String): void
+  + stockedCodes(): Set<String>
+  + totalUnits(): int
+  ' single source of truth for quantities;
+  ' nothing debits stock without an explicit COMMIT
+}
+
+' ---- Cash (two pools) ----
+class CashInventory {
+  - insertedCoins: Deque<Coin>
+  - insertedNotes: Deque<Note>
+  - coinReserves: EnumMap<Coin, Integer>
+  - noteReserves: EnumMap<Note, Integer>
+  + insertCoin(coin: Coin): void
+  + insertNote(note: Note): void
+  + insertedTotal(): int
+  + hasInsertedMoney(): boolean
+  + refundInserted(): Refund
+  + commitInsertedToReserves(): void
+  + loadChange(coin: Coin, quantity: int): void
+  + loadChange(note: Note, quantity: int): void
+  + planChange(amount: int): ChangePlan
+  + dispenseChange(plan: ChangePlan): void
+  + getCoinReserves(): Map<Coin, Integer>
+  + getNoteReserves(): Map<Note, Integer>
+  + reservesTotal(): int
+  ' inserted = customer's money this transaction (insertion order, Deque);
+  ' reserves = the machine's float. Ownership moves ONLY at commit.
+  ' Blending the two is the classic bug: refunds drain the float,
+  ' change plans spend uncommitted money.
+}
+
+class ChangePlan {
+  - notes: Map<Note, Integer>
+  - coins: Map<Coin, Integer>
+  + exact(): ChangePlan
+  + of(notes, coins): ChangePlan
+  + getNotes(): Map<Note, Integer>
+  + getCoins(): Map<Coin, Integer>
+  + totalRupees(): int
+  + isExact(): boolean
+  ' immutable RESERVATION over reserves: plan dry-run mutates nothing,
+  ' dispenseChange commits later — receipt prints it without re-deriving
+}
+
+class Refund {
+  - coins: List<Coin>
+  - notes: List<Note>
+  + getCoins(): List<Coin>
+  + getNotes(): List<Note>
+  + totalRupees(): int
+  ' exactly what the customer inserted, insertion order —
+  ' a dispute ("I put in a 50!") is reconstructable
+}
+
+' ---- State machine ----
+enum VendingState {
+  IDLE
+  HAS_MONEY
+  DISPENSING
+  ' only 3: REFUNDING and OUT_OF_STOCK are EVENTS inside HAS_MONEY,
+  ' not postures — fewer states = fewer illegal transitions to guard
+}
+
+class VendingMachine {
+  - state: VendingState
+  - products: ProductInventory
+  - cash: CashInventory
+  + insertCoin(coin: Coin): void
+  + insertNote(note: Note): void
+  + selectProduct(code: String): void
+  + refund(): Refund
+  + restock(code: String, quantity: int): void
+  + loadChange(coin: Coin, quantity: int): void
+  + loadChange(note: Note, quantity: int): void
+  + getState(): VendingState
+  + audit(): String
+  ' context only: asks inventories questions, tells them outcomes,
+  ' never mutates stock or pools directly
+}
+
+' ---- Demo ----
+class VendingMachineDemo {
+  + main(args: String[]): void
+  ' end-to-end narrative: sale with change, exact payment,
+  ' declined change, refund, guardrails, restock/audit
+}
+
+' ---- Relationships ----
+VendingMachine *-- "1" VendingState : current posture
+VendingMachine *-- "1" ProductInventory
+VendingMachine *-- "1" CashInventory
+
+ProductInventory --> "many" Product : catalog codes
+CashInventory o-- "many" Coin : inserted + reserves
+CashInventory o-- "many" Note : inserted + reserves
+CashInventory ..> ChangePlan : planChange() creates
+CashInventory ..> Refund : refundInserted() creates
+ChangePlan --> "many" Note
+ChangePlan --> "many" Coin
+Refund --> "many" Note
+Refund --> "many" Coin
+VendingMachineDemo ..> VendingMachine : drives
+
+note right of VendingMachine
+  Plan-then-commit everywhere:
+  selectProduct plans change BEFORE any commit;
+  decline path refunds the inserted pool only.
+  No path debits stock or spends reserves
+  until the whole sale is known-good.
+end note
+
+note right of CashInventory
+  Greedy planChange: notes 200→10 then coins
+  10→1; canonical chain makes greedy optimal
+  with full stock; returns null (decline,
+  "exact change only") when reserves cannot
+  compose the amount.
+end note
+
+@enduml

@@ -1,0 +1,104 @@
+@startuml
+title Payment Gateway — Architecture
+
+skinparam componentStyle rectangle
+
+actor "Customer" as Customer
+actor "Merchant Server" as Merchant
+
+package "Edge" {
+  component "API Gateway\n(auth, rate limit, idempotency check)" as APIGW
+  component "Checkout / Hosted Page" as Checkout
+}
+
+package "Payment Core" {
+  component "Payment Service\n(state machine, orchestration)" as PaySvc
+  component "Idempotency Store\n(key -> result)" as Idem
+  component "Method Router\n(pick processor by method/cost/health)" as Router
+  component "Risk / Fraud Service\n(velocity, rules)" as Risk
+}
+
+package "Processor Adapters" {
+  component "Card Adapter\n(Visa/MC via acquirer, 3DS)" as CardAd
+  component "UPI Adapter\n(NPCI)" as UpiAd
+  component "Netbanking Adapter\n(redirect flow)" as NbAd
+  component "Wallet Adapter" as WalletAd
+}
+
+package "Money" {
+  component "Ledger Service\n(append-only, double-entry)" as Ledger
+  component "Settlement Service\n(batch to merchant bank)" as Settle
+  component "Reconciliation Service\n(daily vs bank ledger)" as Recon
+  component "Refund Service" as Refund
+}
+
+package "Notifications" {
+  component "Webhook Service\n(signed, retrying)" as Webhook
+}
+
+package "Storage" {
+  database "Payment Store\n(Postgres, sharded)" as PayStore
+  database "Ledger Store\n(append-only, Postgres/Cassandra)" as LedgerStore
+  database "Idempotency Store\n(Redis + durable)" as IdemStore
+  database "Settlement DB" as SettleDB
+  database "Event Log\n(Kafka, the source of events)" as Kafka
+}
+
+package "External" {
+  component "Acquirer / Card Network" as Acquirer
+  component "Bank / NPCI" as Bank
+  component "Merchant Endpoint" as MerchEndpoint
+}
+
+' ---- flows ----
+Customer --> Checkout
+Merchant --> APIGW : create payment (idempotency-key)
+APIGW --> Idem : seen this key?
+Idem --> IdemStore
+APIGW --> PaySvc
+PaySvc --> Risk : screen
+PaySvc --> Router : route
+Router --> CardAd
+Router --> UpiAd
+Router --> NbAd
+Router --> WalletAd
+CardAd --> Acquirer : authorize/capture
+UpiAd --> Bank : collect
+NbAd --> Bank : redirect
+PaySvc --> Ledger : post entries (on state change)
+PaySvc --> Kafka : emit payment events
+Kafka --> Webhook : consume
+Kafka --> Settle : consume (captured)
+Kafka --> Recon : consume
+Webhook --> MerchEndpoint : signed event (retry until ack)
+Settle --> SettleDB
+Settle --> Bank : settlement file
+Recon --> Bank : fetch settlement file
+Refund --> Ledger
+Refund --> Acquirer
+
+note right of APIGW
+  IDEMPOTENCY IS THE FIRST LINE:
+  every mutating request carries an
+  Idempotency-Key. A repeat returns the
+  ORIGINAL result. This is what makes
+  "retry on timeout" safe.
+end note
+
+note bottom of Ledger
+  DOUBLE-ENTRY, APPEND-ONLY:
+  every money movement writes balanced
+  debit+credit rows. Balance is a projection,
+  never a mutable column. Immutability is
+  what makes audit + reconciliation possible.
+end note
+
+note right of PaySvc
+  EXPLICIT STATE MACHINE:
+  INITIATED -> AUTHORIZED -> CAPTURED -> SETTLED
+  with FAILED / REFUNDED branches.
+  Illegal transitions are rejected; a payment
+  has exactly one authoritative state.
+end note
+
+@enduml

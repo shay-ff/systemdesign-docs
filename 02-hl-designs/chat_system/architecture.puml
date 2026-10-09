@@ -1,0 +1,103 @@
+@startuml
+title Chat System (WhatsApp-like) — Architecture
+
+skinparam componentStyle rectangle
+
+actor "Sender" as Sender
+actor "Recipient" as Recipient
+
+package "Clients" {
+  component "Mobile App\n(WebSocket client)" as MobileApp
+  component "Web Client\n(WebSocket client)" as WebClient
+}
+
+package "Edge" {
+  component "Load Balancer\n(L4, sticky by connection)" as LB
+  component "API Gateway\n(REST: auth, history, media)" as APIGW
+}
+
+package "Real-time Layer" {
+  component "Connection Gateway\n(WebSocket termination)\n~1M conns/node" as Gateway
+  component "Session Registry\n(user -> active sessions)\n(Redis-backed)" as Session
+}
+
+package "Messaging Core" {
+  component "Message Service\n(validate, sequence, persist)" as MsgSvc
+  component "Group Service\n(membership, fan-out)" as GroupSvc
+  component "Receipt Service\n(delivered / read)" as ReceiptSvc
+  component "Delivery Service\n(online push / offline inbox)" as DelivSvc
+}
+
+package "Presence" {
+  component "Presence Service\n(online/offline/typing)" as Presence
+}
+
+package "Media" {
+  component "Media Service\n(upload/download)" as MediaSvc
+  component "Blob Store\n(S3-like)" as Blob
+}
+
+package "Storage" {
+  database "Message Store\n(Cassandra: per-conv log)" as MsgStore
+  database "Offline Inbox\n(per-recipient queue)" as Inbox
+  database "User/Group DB\n(Postgres)" as UserDB
+  database "Media Metadata\n(Postgres)" as MediaDB
+}
+
+package "External" {
+  component "Push Provider\n(APNs / FCM)" as Push
+}
+
+' ---- client connections ----
+Sender --> MobileApp
+Recipient --> WebClient
+MobileApp --> LB : WebSocket (persistent)
+WebClient --> LB : WebSocket (persistent)
+MobileApp --> APIGW : REST (history, media, auth)
+WebClient --> APIGW : REST
+
+' ---- edge to realtime ----
+LB --> Gateway
+APIGW --> MsgSvc
+APIGW --> MediaSvc
+APIGW --> UserDB
+
+' ---- messaging path ----
+Gateway --> MsgSvc : send message
+MsgSvc --> Session : who is online?
+MsgSvc --> MsgStore : persist (assign sequence)
+MsgSvc --> GroupSvc : if group -> resolve members
+MsgSvc --> DelivSvc : route to recipients
+DelivSvc --> Gateway : online: push to recipient session
+DelivSvc --> Inbox : offline: enqueue
+DelivSvc --> Push : offline: notify device
+Gateway --> ReceiptSvc : delivery/read acks
+ReceiptSvc --> Gateway : propagate receipt to sender
+Gateway --> Presence : heartbeat / typing
+Presence --> Session : update liveness
+MediaSvc --> Blob : store bytes
+MediaSvc --> MediaDB : store metadata
+
+note right of MsgSvc
+  STORE-THEN-ROUTE:
+  1. persist + assign per-conversation sequence
+  2. THEN attempt delivery
+  Ack the sender after step 1 (durability),
+  not after step 2 (delivery is best-effort-live,
+  guaranteed eventually via the inbox).
+end note
+
+note bottom of Session
+  Multi-device: user -> set of (deviceId, gatewayNode, connId).
+  A message fans out to every active session;
+  each device acks delivery independently.
+end note
+
+note right of MsgStore
+  Sharded by conversationId.
+  Each conversation is an append-only ordered log;
+  the shard hands out monotonic sequence numbers,
+  which is what guarantees per-conversation ordering.
+end note
+
+@enduml

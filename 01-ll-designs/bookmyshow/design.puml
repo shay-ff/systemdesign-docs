@@ -1,0 +1,237 @@
+@startuml
+' BookMyShow - class diagram (Java 11, no packages)
+
+enum SeatType {
+  REGULAR
+  PREMIUM
+  VIP
+}
+
+enum SeatStatus {
+  AVAILABLE
+  LOCKED
+  BOOKED
+  EXPIRED
+}
+
+class City {
+  - name: String
+  - theatres: List<Theatre>
+  + addTheatre(t: Theatre): void
+  + getTheatres(): List<Theatre>
+}
+
+class Theatre {
+  - theatreId: String
+  - name: String
+  - cityName: String
+  - screensById: Map<String, Screen>
+  + addScreen(id, name): Screen
+  + getScreen(id): Screen
+  + getCityName(): String
+}
+
+class Screen {
+  - screenId: String
+  - name: String
+  - seatsById: Map<String, Seat>
+  + addRow(row, from, to, type): void
+  + seatId(row, number): String
+  + getSeats(): List<Seat>
+}
+
+class Seat {
+  - seatId: String
+  - row: String
+  - number: int
+  - seatType: SeatType
+  + getSeatType(): SeatType
+}
+
+class Movie {
+  - movieId: String
+  - title: String
+  - language: String
+  - durationMinutes: int
+  - genre: String
+}
+
+class User {
+  - userId: String
+  - name: String
+  - email: String
+}
+
+class Show {
+  - showId: String
+  - movie: Movie
+  - screen: Screen
+  - theatre: Theatre
+  - startTime: LocalDateTime
+  - priceMultiplier: double
+  - showSeats: Map<String, ShowSeat>
+  + getShowSeat(seatId): ShowSeat
+  + getShowSeats(): List<ShowSeat>
+}
+
+class ShowSeat {
+  - showId: String
+  - seat: Seat
+  - status: AtomicReference<SeatStatus>
+  - lockedByUserId: String
+  - holdExpiresAt: Instant
+  + tryLock(userId, expiresAt): boolean
+  + confirmBooking(userId): void
+  + release(userId): void
+  + expireIfLapsed(now): boolean
+  + isAvailable(): boolean
+}
+
+class SeatHold {
+  - holdId: String
+  - showId: String
+  - userId: String
+  - seatIds: List<String>
+  - totalAmount: double
+  - expiresAt: Instant
+}
+
+class Booking {
+  - bookingId: String
+  - userId: String
+  - show: Show
+  - seatIds: List<String>
+  - totalAmount: double
+  - paymentId: String
+  - bookedAt: Instant
+}
+
+class BookingService {
+  - seatLocks: Map<String, ReentrantLock>
+  - registeredShows: Map<String, Show>
+  - idempotencyCache: Map<String, Booking>
+  - lockHoldSeconds: long
+  - expirySweeper: ScheduledExecutorService
+  + registerShow(show): void
+  + lockSeats(showId, userId, seatIds): SeatHold
+  + confirmHold(hold, bookingId): Booking
+  + cancelHold(hold): void
+  + sweepExpiredHolds(): int
+  + start(): void
+  + shutdown(): void
+}
+
+class SearchService {
+  - shows: List<Show>
+  - cities: List<City>
+  + addCity(city): void
+  + addShow(show): void
+  + findShows(city, movieTitle, afterHour, beforeHour): List<Show>
+}
+
+class AdminService {
+  - searchService: SearchService
+  - bookingService: BookingService
+  + registerCity(name): City
+  + registerTheatre(city, id, name): Theatre
+  + addScreen(theatreId, screenId, name, rows): Screen
+  + scheduleShow(theatreId, screenId, showId, movie, start, multiplier): Show
+}
+
+class PriceCalculator {
+  - basePriceBySeatType: EnumMap<SeatType, Double>
+  + calculateTotal(show, seats): double
+  + unitPrice(show, type): double
+}
+
+interface PaymentGateway {
+  + charge(bookingId, userId, amount): PaymentResult
+}
+
+class MockPaymentGateway implements PaymentGateway {
+  - scriptedOutcomes: Queue<PaymentResult>
+  + script(outcomes): MockPaymentGateway
+  + charge(...): PaymentResult
+}
+
+class PaymentResult {
+  - status: Status {SUCCESS, FAILURE}
+  - paymentId: String
+  - failureReason: String
+  + isSuccess(): boolean
+}
+
+interface BookingRepository {
+  + save(booking): Booking
+  + findById(id): Optional<Booking>
+  + findByUserId(userId): List<Booking>
+  + findAll(): List<Booking>
+}
+
+class InMemoryBookingRepository implements BookingRepository {
+  - bookingsById: ConcurrentHashMap
+}
+
+' Relationships
+City "1" o-- "many" Theatre : has
+Theatre "1" *-- "many" Screen : owns
+Screen "1" *-- "many" Seat : physical layout (immutable)
+Movie "1" o-- "many" Show : scheduled as
+Show "many" --> "1" Screen : plays on
+Show "many" --> "1" Movie
+Show "many" --> "1" Theatre
+Show "1" *-- "many" ShowSeat : one row per seat, per show
+ShowSeat "many" --> "1" Seat : availability of
+ShowSeat ..> SeatStatus : state machine (CAS)
+Seat ..> SeatType
+Booking "many" --> "1" Show : paid for
+SeatHold "1" o-- "many" seatIds : receipt (value object)
+BookingService ..> ShowSeat : CAS transitions under per-seat locks
+BookingService ..> PaymentGateway : charges outside seat locks
+BookingService ..> PriceCalculator : prices holds
+BookingService ..> BookingRepository : persists confirmed bookings
+BookingService ..> SeatHold : mints
+SearchService "1" o-- "many" Show : indexes
+SearchService "1" o-- "many" City
+AdminService ..> SearchService : fan-out: searchable
+AdminService ..> BookingService : fan-out: bookable
+
+note bottom of ShowSeat
+  THE HEART of the design. Every transition
+  is an AtomicReference CAS, guarded in the
+  entity itself:
+  AVAILABLE -> LOCKED -> BOOKED
+  LOCKED -> AVAILABLE (payment failed)
+  LOCKED -> EXPIRED -> AVAILABLE (hold timed out)
+  A seat free in the 6pm show can be booked
+  in the 9pm show: state is per (show, seat).
+end note
+
+note bottom of BookingService
+  Pessimistic per-seat ReentrantLocks,
+  acquired in SORTED seat-id order ->
+  no deadlock even when bookings overlap.
+  Mutexes cover ONLY state mutation,
+  NEVER the payment call - the LOCKED
+  status + hold expiry protect the seat
+  while the gateway charges (seconds).
+  Idempotency: confirmHold is keyed on
+  bookingId; double-click / webhook
+  redelivery returns the original booking.
+end note
+
+note right of PaymentGateway
+  Business failure is a VALUE
+  (PaymentResult.FAILURE + reason),
+  not an exception. Mock is scriptable
+  so the demo can force a decline.
+end note
+
+note bottom of Show
+  The constructor instantiates one
+  ShowSeat per physical seat on the
+  screen - availability is created
+  fresh per show, never stored on the
+  shared Seat catalog objects.
+end note
+@enduml

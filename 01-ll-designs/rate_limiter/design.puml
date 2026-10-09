@@ -1,0 +1,8 @@
+@startuml
+class TokenBucket {
+  - capacity:int
+  - tokens:double
+  - refill_rate:double
+  + allow() : bool
+}
+@enduml

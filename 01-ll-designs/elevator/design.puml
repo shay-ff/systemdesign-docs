@@ -1,0 +1,135 @@
+@startuml elevator
+title Elevator System — Low Level Design
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+
+enum Direction {
+  + UP
+  + DOWN
+  + {static} between(from, to) : Direction
+  + isMoving() : boolean
+}
+
+enum RequestSource {
+  FLOOR_BUTTON
+  CAB_BUTTON
+}
+
+enum ElevatorState {
+  IDLE
+  MOVING_UP
+  MOVING_DOWN
+  DOORS_OPEN
+  + isMoving() : boolean
+}
+
+class ElevatorRequest {
+  - id : long
+  - source : RequestSource
+  - floorNumber : int
+  - direction : Direction
+  + {static} floorButton(floor, dir) : ElevatorRequest
+  + {static} cabButton(floor) : ElevatorRequest
+  + isHallCall() : boolean
+  + getFloorNumber() : int
+  + getDirection() : Direction
+  + getId() : long
+}
+
+class Floor {
+  - number : int
+  - maxFloors : int
+  + above() : Floor
+  + below() : Floor
+  + distanceTo(target) : int
+}
+
+interface ElevatorScheduler {
+  + name() : String
+  + describe() : String
+  + nextStop(currentFloor, direction, requests) : Integer
+}
+
+class FcfsScheduler {
+  + name() : String
+  + nextStop(...) : Integer
+}
+
+class ScanScheduler {
+  - nearestServiceable(...)
+  - farthestAny(...)
+  - chooseSweep(...)
+  + nextStop(...) : Integer
+}
+
+class ElevatorCar {
+  - id : String
+  - currentFloor : int
+  - state : ElevatorState
+  - direction : Direction
+  - capacity : int
+  - passengersAboard : int
+  - pendingRequests : List<ElevatorRequest>
+  - scheduler : ElevatorScheduler
+  - totalFloorsTravelled : int
+  - totalStops : int
+  + accept(request) : void
+  + tick() : void
+  + canAcceptHallCall() : boolean
+  + estimateCost(floor, dir) : int
+  + isIdle() : boolean
+  + hasPendingRequests() : boolean
+}
+
+class ElevatorSystem {
+  - maxFloors : int
+  - cars : List<ElevatorCar>
+  + addCar(car) : void
+  + hallCall(floor, dir) : void
+  + cabCall(carId, floor) : void
+  + tickAll() : boolean
+  + runUntilIdle(maxTicks) : void
+}
+
+class ElevatorDemo {
+  + {static} main(args) : void
+}
+
+ElevatorScheduler <|.. FcfsScheduler
+ElevatorScheduler <|.. ScanScheduler
+
+ElevatorCar o-- "many" ElevatorRequest : pending
+ElevatorCar o-- ElevatorScheduler : strategy
+ElevatorCar *-- ElevatorState : state
+ElevatorCar *-- Direction : direction
+
+ElevatorSystem o-- "many" ElevatorCar : dispatches
+ElevatorRequest --> RequestSource
+ElevatorRequest --> Direction : intent
+ElevatorDemo ..> ElevatorSystem : drives
+ElevatorDemo ..> ElevatorScheduler : injects
+
+note right of ElevatorScheduler
+  Strategy seam: FCFS vs SCAN/LOOK
+  are interchangeable; the car
+  stops ONLY at the scheduler's
+  chosen floor (no policy leak).
+end note
+
+note bottom of ElevatorCar
+  State machine (one unit of work
+  per tick): DOORS_OPEN -> close ->
+  IDLE -> plan -> MOVING_* -> arrive
+  -> DOORS_OPEN. Capacity is counted
+  as commitments (aboard + promised
+  hall pickups).
+end note
+
+note right of ElevatorSystem
+  Dispatcher: nearest suitable car
+  by LOOK-aware estimateCost for
+  hall calls; cab calls route
+  directly. Owns the tick pump.
+end note
+@enduml

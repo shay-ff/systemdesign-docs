@@ -1,0 +1,224 @@
+@startuml
+' Notification System - class diagram (Java 11, no packages)
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationPriority {
+  HIGH
+  NORMAL
+  {field} queueRank: int
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+  DEAD_LETTER
+  DUPLICATE
+  RATE_LIMITED
+}
+
+class Notification <<abstract>> {
+  # notificationId: String
+  # recipient: String
+  # subject: String
+  # message: String
+  # channel: NotificationChannel
+  # priority: NotificationPriority
+  # createdAt: Instant
+  # attemptCount: AtomicInteger
+  + format(): String
+  + {abstract} formatBody(): String
+  + {abstract} withId(id): Notification
+  # overrideId(id): Notification
+  + incrementAttempt(): int
+}
+
+class EmailNotification {
+  + formatBody(): String
+  + withId(id): Notification
+}
+class SmsNotification {
+  + formatBody(): String
+  + withId(id): Notification
+}
+class PushNotification {
+  + formatBody(): String
+  + openSeparator(): String
+  + closeSeparator(): String
+  + withId(id): Notification
+}
+
+EmailNotification --up|> Notification
+SmsNotification --up|> Notification
+PushNotification --up|> Notification
+
+interface NotificationSender {
+  + getChannel(): NotificationChannel
+  + send(notification): void
+}
+
+class EmailSender {
+  - failOnAttempts: Set<Integer>
+  + send(notification): void
+}
+class SwitchableSmsSender {
+  - gatewayDown: AtomicBoolean
+  + setGatewayDown(down): void
+  + send(notification): void
+}
+class PushSender {
+  - deadToken: String
+  + send(notification): void
+}
+
+EmailSender ..up.|> NotificationSender
+SwitchableSmsSender ..up.|> NotificationSender
+PushSender ..up.|> NotificationSender
+
+class SendException {
+  - transientFailure: boolean
+  + isTransient(): boolean
+}
+
+class RetryPolicy {
+  - maxAttempts: int
+  - baseBackoffMillis: long
+  - maxBackoffMillis: long
+  + canRetry(attemptsSoFar): boolean
+  + backoffMillisBefore(attemptNumber): long
+}
+
+class TokenBucketRateLimiter {
+  - capacity: int
+  - refillTokensPerMillis: double
+  - tokens: double
+  - lastRefillNanos: long
+  + allow(): boolean
+  - refill(): void
+}
+
+class NotificationAttempt <<immutable>> {
+  - attemptNumber: int
+  - outcome: String
+  - at: Instant
+}
+
+class DeliveryOutcome <<immutable>> {
+  - notificationId: String
+  - status: NotificationStatus
+  - attempts: List<NotificationAttempt>
+  - detail: String
+  + summaryLine(): String
+}
+
+class DispatcherService {
+  - senders: Map<NotificationChannel, NotificationSender>
+  - limiters: Map<NotificationChannel, TokenBucketRateLimiter>
+  - retryPolicy: RetryPolicy
+  - queue: PriorityBlockingQueue<QueueEntry>
+  - workers: ExecutorService
+  - deliveredIds: Set<String>
+  - enqueuedIds: Set<String>
+  - outcomes: List<DeliveryOutcome>
+  - deadLetters: List<DeliveryOutcome>
+  + enqueue(notification): DeliveryOutcome
+  - workerLoop(): void
+  - deliver(notification): void
+  - requeue(notification): void
+  - deadLetter(notification, reason): void
+  - shutdown(timeoutMillis): void
+  + isIdle(): boolean
+  + getOutcomes(): List<DeliveryOutcome>
+  + getDeadLetters(): List<DeliveryOutcome>
+  ..
+  + QueueEntry {
+    - notification: Notification
+    - sequence: long
+    + compareTo(other): int
+  }
+}
+
+class NotificationDemo {
+  + {static} main(args): void
+}
+
+' Relationships
+DispatcherService "1" o-- "many" NotificationSender : one per channel (strategy)
+DispatcherService "1" o-- "many" TokenBucketRateLimiter : one per channel
+DispatcherService "1" --> "1" RetryPolicy : injected budget
+DispatcherService "1" *-- "1" PriorityBlockingQueue : (rank, sequence) ordering
+DispatcherService "1" o-- "many" DeliveryOutcome : outcome log
+DispatcherService "1" o-- "many" DeliveryOutcome : dead-letter log
+NotificationSender ..> Notification : sends
+NotificationSender ..> SendException : throws
+SendException o-- "1" boolean : transient vs permanent
+DeliveryOutcome "1" o-- "many" NotificationAttempt : attempt history
+Notification ..> NotificationChannel
+Notification ..> NotificationPriority
+DeliveryOutcome ..> NotificationStatus
+NotificationDemo --> DispatcherService : drives
+NotificationDemo ..> Notification : enqueues
+
+note right of DispatcherService
+  The deliver() decision tree:
+  1. sink dedupe (deliveredIds)?
+     -> DUPLICATE, stop
+  2. channel rate limiter?
+     -> re-queue (DEFER, not fail)
+  3. send ok?
+     -> SENT + remember id
+  4. permanent failure?
+     -> DEAD_LETTER (no retries)
+  5. transient + budget left?
+     -> backoff then re-queue
+  6. budget exhausted?
+     -> DEAD_LETTER with history
+end note
+
+note bottom of DispatcherService
+  PRIORITY QUEUE CRUX: comparator
+  orders by (priority rank, arrival
+  sequence). The sequence tiebreaker
+  is the detail interviewers miss -
+  without it, equal-priority elements
+  order arbitrarily and FIFO within
+  a rank silently breaks.
+  STARVATION trade-off: strict rank
+  starves NORMAL under sustained HIGH;
+  fix = aging (see explanation.md),
+  deliberately NOT bolted in here.
+end note
+
+note left of Notification
+  notificationId is THE key field:
+  at-least-once delivery replays the
+  same message (worker died after
+  send-before-ack; broker redrive).
+  Dedupe happens at the SINK
+  (deliveredIds), not only at enqueue -
+  the failure window is AFTER a
+  successful send.
+end note
+
+note bottom of RetryPolicy
+  Exponential backoff with cap:
+  backoff(n) = min(base * 2^(n-1), cap)
+  Demo scale: base 150ms, cap 400ms,
+  3 attempts (~2s total story).
+  Injected policy - retry budgets are
+  configuration, not code edits.
+end note
+
+note right of TokenBucketRateLimiter
+  Minimal built-in bucket (burst +
+  steady refill) for per-channel
+  vendor quotas. The full rate-limiter
+  treatment lives in
+  01-ll-designs/rate_limiter/.
+end note
+@enduml
