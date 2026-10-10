@@ -32,8 +32,12 @@ exclude_docs: |
   03-implementations/**/examples/
   assets/README.txt
 
+extra_javascript:
+  - https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js
+
 theme:
   name: material
+  custom_dir: overrides
   language: en
   palette:
     - media: "(prefers-color-scheme: light)"
