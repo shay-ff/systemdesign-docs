@@ -33,7 +33,7 @@ exclude_docs: |
   assets/README.txt
 
 extra_javascript:
-  - https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js
+  - assets/javascripts/page-views.js
 
 theme:
   name: material
